@@ -1,0 +1,220 @@
+.express-root {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1.5rem 0;
+}
+
+.express-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  border: 1px solid #e0e7ff;
+}
+
+.express-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 1rem;
+}
+
+.express-card-header-icon {
+  background-color: #e0e7ff;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  color: #4f46e5;
+}
+
+.express-card-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.express-card-header p {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Shared form styles */
+.form-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.form-back-btn:hover { color: #1e293b; }
+
+.form-error {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-section {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1rem;
+}
+
+.form-section-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-section-title--indigo  { color: #3730a3; }
+.form-section-title--red     { color: #991b1b; }
+.form-section-title--emerald { color: #065f46; }
+
+.form-section--danger {
+  background-color: rgba(254, 242, 242, 0.5);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #fee2e2;
+}
+
+.form-group {
+  margin-bottom: 0.75rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.form-label--red { color: #991b1b; }
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: box-shadow 0.2s;
+  font-family: inherit;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  box-shadow: 0 0 0 2px #6366f1;
+  border-color: transparent;
+}
+
+.form-input--red:focus,
+.form-select--red:focus {
+  box-shadow: 0 0 0 2px #f87171;
+}
+
+.form-input--icon {
+  padding-left: 2.5rem;
+}
+
+.form-input-wrapper {
+  position: relative;
+}
+
+.form-input-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.form-col-span-2 { grid-column: span 2; }
+
+.form-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+}
+
+.form-terms input[type="checkbox"] {
+  margin-top: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #4f46e5;
+  flex-shrink: 0;
+}
+
+.form-terms span {
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.form-submit {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s, opacity 0.2s;
+  color: white;
+}
+
+.form-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-submit--indigo  { background-color: #4f46e5; }
+.form-submit--indigo:hover:not(:disabled)  { background-color: #4338ca; }
+
+.form-submit--emerald { background-color: #059669; }
+.form-submit--emerald:hover:not(:disabled) { background-color: #047857; }
+
+.form-space { display: flex; flex-direction: column; gap: 1.5rem; }
