@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Save, User, AlertCircle, CreditCard, Dumbbell, Zap } from 'lucide-react';
+import { crearValiente } from '../../../lib/services/valientes.service';
+import { crearAcudiente, vincularAcudiente } from '../../../lib/services/acudientes.service';
+import { guardarPerfilDeportivo, guardarSalud } from '../../../lib/services/perfiles.service';
 import './ExpressRegistration.css';
 
 interface ExpressRegistrationProps {
@@ -9,6 +12,8 @@ interface ExpressRegistrationProps {
 
 const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBack }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     discipline: 'ULTIMATE',
     docType: 'TI', docId: '',
@@ -28,9 +33,133 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
     if (errorMsg) setErrorMsg(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Express submit:', formData);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+
+    try {
+      // 1. Crear valiente
+      const valiente = await crearValiente({
+        tipo_documento: formData.docType,
+        numero_documento: formData.docId,
+        nombres: formData.firstName,
+        apellidos: formData.lastName,
+        apodo: null,
+        sexo: formData.sex,
+        identidad_genero: formData.genderIdentity || null,
+        fecha_nacimiento: formData.birthDate,
+        celular: formData.phone,
+        telefono_fijo: null,
+        email: null,
+        redes_sociales: null,
+        lugar_nacimiento: null,
+        nacionalidad: 'Colombiana',
+        estado: 'ACTIVO',
+        foto_url: null,
+        created_by: null,
+        updated_by: null,
+      });
+
+      // 2. Crear acudiente
+      const acudiente = await crearAcudiente({
+        tipo_documento: null,
+        numero_documento: null,
+        nombre_completo: formData.guardianName,
+        celular: formData.guardianPhone,
+        telefono_fijo: null,
+        email: null,
+        sexo: null,
+        edad: null,
+        ocupacion: null,
+        tipo_empleo: null,
+        grupo_vulnerabilidad: null,
+        tiene_autorizacion_firmada: false,
+      });
+
+      // 3. Vincular acudiente con valiente
+      await vincularAcudiente(valiente.id, acudiente.id, {
+        parentesco: formData.guardianKinship,
+        es_principal: true,
+        es_contacto_emergencia: true,
+        vive_con_valiente: false,
+      });
+
+      // 4. Guardar información de salud
+      await guardarSalud({
+        valiente_id: valiente.id,
+        eps_id: null,
+        ips_id: null,
+        tipo_sangre: null,
+        tiene_discapacidad: false,
+        tipo_discapacidad: null,
+        diagnostico_medico: formData.hasMedicalCondition === 'Si' ? formData.medicalDetails : null,
+        tiene_alergias: formData.hasMedicalCondition === 'Si',
+        alergias: formData.hasMedicalCondition === 'Si' ? formData.medicalDetails : null,
+        medicamentos_actuales: formData.medications || null,
+        tratamiento_en_curso: null,
+        contacto_emergencia_nombre: formData.guardianName,
+        contacto_emergencia_telefono: formData.guardianPhone,
+        contacto_emergencia_parentesco: formData.guardianKinship,
+      });
+
+      // 5. Guardar perfil deportivo (solo para TRIBU)
+      if (context === 'TRIBU') {
+        await guardarPerfilDeportivo({
+          valiente_id: valiente.id,
+          disciplina: formData.discipline,
+          tiene_experiencia_previa: formData.rugbyBackground === 'Si',
+          experiencia_previa: formData.rugbyBackground === 'Si' ? 'Experiencia previa' : null,
+          talla_guayos: formData.shoeSize || null,
+          talla_camisa: formData.shirtSize || null,
+          talla_pantalon: null,
+          horario_entrenamiento: null,
+          disponibilidad: null,
+        });
+      }
+
+      setSuccessMsg(`¡Valiente ${formData.firstName} ${formData.lastName} registrado exitosamente!`);
+      
+      // Limpiar formulario después de 2 segundos
+      setTimeout(() => {
+        setFormData({
+          discipline: 'ULTIMATE',
+          docType: 'TI', docId: '',
+          firstName: '', lastName: '',
+          sex: '', genderIdentity: '',
+          birthDate: '', linkage: '', phone: '',
+          guardianName: '', guardianKinship: '', guardianPhone: '',
+          hasMedicalCondition: 'No', medicalDetails: '', medications: '',
+          rugbyBackground: 'No', shirtSize: '', shoeSize: '',
+          motivation: '', terms: false,
+        });
+        setSuccessMsg(null);
+      }, 3000);
+
+    } catch (error: any) {
+      console.error('Error al registrar valiente:', error);
+      
+      // Mostrar detalles del error
+      let errorMessage = 'Error al registrar el valiente. ';
+      
+      if (error.message) {
+        errorMessage += error.message;
+      }
+      
+      if (error.details) {
+        errorMessage += ` Detalles: ${error.details}`;
+      }
+      
+      if (error.hint) {
+        errorMessage += ` Sugerencia: ${error.hint}`;
+      }
+      
+      console.log('Error completo:', JSON.stringify(error, null, 2));
+      setErrorMsg(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,6 +180,21 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         {errorMsg && (
           <div className="form-error">
             <AlertCircle size={16} /> {errorMsg}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="form-success" style={{ 
+            padding: '1rem', 
+            backgroundColor: '#10b981', 
+            color: 'white', 
+            borderRadius: '0.5rem', 
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <Save size={16} /> {successMsg}
           </div>
         )}
 
@@ -191,8 +335,8 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
             <span>Autoriza participación deportiva bajo su propio riesgo (Firma pendiente).</span>
           </label>
 
-          <button type="submit" disabled={!formData.terms} className="form-submit form-submit--indigo">
-            <Save size={20} /> Registrar Valiente
+          <button type="submit" disabled={!formData.terms || loading} className="form-submit form-submit--indigo">
+            <Save size={20} /> {loading ? 'Registrando...' : 'Registrar Valiente'}
           </button>
         </form>
       </div>

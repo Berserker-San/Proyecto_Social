@@ -1,73 +1,54 @@
-# React + TypeScript + Vite
+# Trivium — Sistema de Gestión de Valientes
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación web para el registro y seguimiento de participantes (valientes) en los programas sociales de la fundación.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+- React 18 + TypeScript
+- Vite 5
+- Supabase (base de datos + auth)
+- Lucide React (iconos)
+- Recharts (gráficas)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Configuración local
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Instalar dependencias:
+   ```bash
+   npm install
+   ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+2. Crear `.env.local` en la raíz con las variables de Supabase:
+   ```
+   VITE_SUPABASE_URL=tu_url
+   VITE_SUPABASE_ANON_KEY=tu_anon_key
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+3. Correr en desarrollo:
+   ```bash
+   npm run dev
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Estado actual
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Funciona
+- Login con Supabase Auth.
+- Registro Express: captura datos básicos del valiente, acudiente, salud y perfil deportivo, y los guarda en Supabase.
+- Navegación entre vistas (Login → Welcome → RegistrationView → ExpressRegistration).
+- Estructura de servicios y tipos TypeScript alineada con el esquema de base de datos.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Pendiente
+- Registro Completo (FullRegistration): formulario existe pero no está conectado a Supabase.
+- Poblar catálogos en Supabase (ciudades, comunas, EPS, instituciones educativas).
+- Módulo de asistencias.
+- Dashboard y estadísticas.
+- Gestión de usuarios y roles desde la UI.
+
+---
+
+Para el detalle de las tablas creadas y los servicios implementados, ver [`CHANGES_DATA_EXPRESS.md`](./CHANGES_DATA_EXPRESS.md).

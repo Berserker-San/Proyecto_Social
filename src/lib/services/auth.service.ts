@@ -1,95 +1,87 @@
 import { supabase } from '../supabase';
+import type { UsuarioSistema } from '../../types/database.types';
 
-export const authService = {
-  // Iniciar sesión
-  async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) throw error;
+// =========================================================
+// SERVICIO DE AUTENTICACIÓN
+// =========================================================
 
-    // Actualizar last_login del administrador
-    if (data.user) {
-      await supabase
-        .from('administrators')
-        .update({ last_login: new Date().toISOString() })
-        .eq('user_id', data.user.id);
-    }
+/**
+ * Iniciar sesión con email y contraseña
+ */
+export async function signIn(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-    return data;
-  },
+  if (error) throw error;
+  return data;
+}
 
-  // Cerrar sesión
-  async signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  },
+/**
+ * Cerrar sesión
+ */
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
 
-  // Obtener usuario actual
-  async getCurrentUser() {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    return user;
-  },
+/**
+ * Obtener usuario actual de Supabase Auth
+ */
+export async function getCurrentAuthUser() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  return user;
+}
 
-  // Obtener perfil de administrador
-  async getAdminProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('administrators')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
+/**
+ * Obtener información del usuario del sistema
+ */
+export async function getCurrentUsuarioSistema() {
+  const authUser = await getCurrentAuthUser();
+  if (!authUser) return null;
 
-  // Registrar nuevo administrador
-  async signUp(email: string, password: string, adminData: {
-    username: string;
-    full_name: string;
-    role: string;
-    program_access: string[];
-  }) {
-    // Crear usuario en auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    
-    if (authError) throw authError;
+  const { data, error } = await supabase
+    .from('usuario_sistema')
+    .select(`
+      *,
+      roles:usuario_rol(
+        rol(*)
+      )
+    `)
+    .eq('auth_user_id', authUser.id)
+    .single();
 
-    // Crear perfil de administrador
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('administrators')
-        .insert([{
-          user_id: authData.user.id,
-          ...adminData,
-          program_access: adminData.program_access
-        }]);
-      
-      if (profileError) throw profileError;
-    }
+  if (error) throw error;
+  return data as UsuarioSistema & { roles: any[] };
+}
 
-    return authData;
-  },
+/**
+ * Verificar si el usuario tiene un rol específico
+ */
+export async function hasRole(roleCodigo: string): Promise<boolean> {
+  const usuario = await getCurrentUsuarioSistema();
+  if (!usuario) return false;
 
-  // Cambiar contraseña
-  async updatePassword(newPassword: string) {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-    
-    if (error) throw error;
-  },
+  return usuario.roles.some((ur: any) => ur.rol.codigo === roleCodigo);
+}
 
-  // Verificar si hay sesión activa
-  async getSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return session;
-  }
-};
+/**
+ * Verificar si el usuario es admin
+ */
+export async function isAdmin(): Promise<boolean> {
+  return hasRole('ADMIN');
+}
+
+/**
+ * Registrar último login
+ */
+export async function registrarLogin(usuarioId: string) {
+  const { error } = await supabase
+    .from('usuario_sistema')
+    .update({ last_login: new Date().toISOString() })
+    .eq('id', usuarioId);
+
+  if (error) throw error;
+}
