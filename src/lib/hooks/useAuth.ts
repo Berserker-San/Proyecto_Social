@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { signIn as authSignIn, signOut as authSignOut, getCurrentUsuarioSistema } from '../services/auth.service';
-import type { UsuarioSistema } from '../../types/database.types';
+// import type { UsuarioSistema } from '../../types/database.types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -20,7 +20,7 @@ export function useAuth() {
         
         setUser(session?.user ?? null);
         if (session?.user) {
-          loadUsuarioSistema().catch(console.error);
+          await loadUsuarioSistema();
         }
       } catch (error) {
         console.error('Error checking session:', error);
@@ -55,6 +55,7 @@ export function useAuth() {
   const loadUsuarioSistema = async () => {
     try {
       const usuario = await getCurrentUsuarioSistema();
+      console.log("usuario", usuario);
       setUsuarioSistema(usuario);
     } catch (error) {
       console.error('Error loading usuario sistema:', error);

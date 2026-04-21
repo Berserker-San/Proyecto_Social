@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, Shield, ArrowLeftRight, LogOut, Upload } from 'lucide-react';
+import { UserPlus, Shield, ArrowLeftRight, LogOut, BarChart2, Upload } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../customIcons/customIcons';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -14,7 +14,7 @@ export interface NavbarProps {
 }
 
 const contextStyles: Record<AppContext, { sidebar: string; accent: string }> = {
-  TRIBU:  { sidebar: 'bg-indigo-900 border-indigo-800', accent: 'text-indigo-400' },
+  TRIBU: { sidebar: 'bg-indigo-900 border-indigo-800', accent: 'text-indigo-400' },
   SOROCA: { sidebar: 'bg-emerald-900 border-emerald-800', accent: 'text-emerald-400' },
   GLOBAL: { sidebar: 'bg-slate-900 border-slate-800', accent: 'text-blue-400' },
 };
@@ -33,7 +33,6 @@ const Navbar: React.FC<NavbarProps> = ({
     <>
       {/* DESKTOP SIDEBAR */}
       <aside className={`hidden md:flex flex-col w-72 fixed h-full z-20 shadow-2xl transition-colors duration-500 ${sidebar} text-white`}>
-
         {/* Logo */}
         <div
           className="p-8 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors"
@@ -51,7 +50,7 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 px-6 py-2">
+        <nav className="flex-1 px-6 py-2 space-y-2">
           <button
             onClick={() => onChangeView('registration')}
             className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
@@ -74,6 +73,18 @@ const Navbar: React.FC<NavbarProps> = ({
           >
             <Upload size={18} />
             <span className="text-sm font-medium">Carga CSV</span>
+          </button>
+
+          <button
+            onClick={() => onChangeView('estadisticas')}
+            className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
+              activeView === 'estadisticas'
+                ? 'bg-white/10 border-white/20 text-white shadow-lg'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <BarChart2 size={18} />
+            <span className="text-sm font-medium">Estadísticas</span>
           </button>
         </nav>
 
@@ -146,32 +157,60 @@ const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onChangeView('registration')}
             className="flex flex-col items-center justify-center min-w-[50px] py-2 transition-all duration-300 group"
           >
-            <div className={`transition-all duration-300 transform ${
-              activeView === 'registration' ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
-            }`}>
+            <div
+              className={`transition-all duration-300 transform ${
+                activeView === 'registration' ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
+              }`}
+            >
               <UserPlus size={activeView === 'registration' ? 24 : 20} strokeWidth={activeView === 'registration' ? 2.5 : 2} />
             </div>
-            <div className={`mt-1.5 rounded-full transition-all duration-300 ${
-              activeView === 'registration'
-                ? 'w-1.5 h-1.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]'
-                : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
-            }`} />
+            <div
+              className={`mt-1.5 rounded-full transition-all duration-300 ${
+                activeView === 'registration'
+                  ? 'w-1.5 h-1.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]'
+                  : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
+              }`}
+            />
           </button>
 
           <button
             onClick={() => onChangeView('csv-upload')}
             className="flex flex-col items-center justify-center min-w-[50px] py-2 transition-all duration-300 group"
           >
-            <div className={`transition-all duration-300 transform ${
-              activeView === 'csv-upload' ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
-            }`}>
+            <div
+              className={`transition-all duration-300 transform ${
+                activeView === 'csv-upload' ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
+              }`}
+            >
               <Upload size={activeView === 'csv-upload' ? 24 : 20} strokeWidth={activeView === 'csv-upload' ? 2.5 : 2} />
             </div>
-            <div className={`mt-1.5 rounded-full transition-all duration-300 ${
-              activeView === 'csv-upload'
-                ? 'w-1.5 h-1.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
-                : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
-            }`} />
+            <div
+              className={`mt-1.5 rounded-full transition-all duration-300 ${
+                activeView === 'csv-upload'
+                  ? 'w-1.5 h-1.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
+                  : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
+              }`}
+            />
+          </button>
+
+          <button
+            onClick={() => onChangeView('estadisticas')}
+            className="flex flex-col items-center justify-center min-w-[50px] py-2 transition-all duration-300 group"
+          >
+            <div
+              className={`transition-all duration-300 transform ${
+                activeView === 'estadisticas' ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
+              }`}
+            >
+              <BarChart2 size={activeView === 'estadisticas' ? 24 : 20} strokeWidth={activeView === 'estadisticas' ? 2.5 : 2} />
+            </div>
+            <div
+              className={`mt-1.5 rounded-full transition-all duration-300 ${
+                activeView === 'estadisticas'
+                  ? 'w-1.5 h-1.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+                  : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
+              }`}
+            />
           </button>
         </div>
       </nav>
