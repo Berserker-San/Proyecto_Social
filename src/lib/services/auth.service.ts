@@ -46,7 +46,7 @@ export async function getCurrentUsuarioSistema() {
     .from('usuario_sistema')
     .select(`
       *,
-      roles:usuario_rol(
+      roles:usuario_rol!usuario_rol_usuario_id_fkey(
         rol(*)
       )
     `)

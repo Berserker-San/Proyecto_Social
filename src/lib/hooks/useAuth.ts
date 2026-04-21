@@ -6,7 +6,7 @@ import type { UsuarioSistema } from '../../types/database.types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [usuarioSistema, setUsuarioSistema] = useState<any>(null);
+  const [usuarioSistema, setUsuarioSistema] = useState<UsuarioSistema & { roles: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export function useAuth() {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         if (!mounted) return;
         
         setUser(session?.user ?? null);

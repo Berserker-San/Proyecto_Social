@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Navbar from '../../components/Navbar/Navbar';
 import WelcomeView from '../Welcome/WelcomeView';
 import RegistrationView from '../Registration/RegistrationView/RegistrationView';
+import CSVUploader from '../../components/CSVUploader/CSVUploader';
 import './Layout.css';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -32,6 +33,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   const renderContent = () => {
     if (activeView === 'welcome') return <WelcomeView onSelectProgram={handleSelectProgram} />;
     if (activeView === 'registration') return <RegistrationView context={appContext} onChangeProgram={handleChangeProgram} />;
+    if (activeView === 'csv-upload') return <CSVUploader onBack={() => setActiveView('welcome')} />;
     return null;
   };
 

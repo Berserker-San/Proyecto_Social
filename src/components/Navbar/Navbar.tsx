@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, Shield, ArrowLeftRight, LogOut } from 'lucide-react';
+import { UserPlus, Shield, ArrowLeftRight, LogOut, Upload } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../customIcons/customIcons';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -62,6 +62,18 @@ const Navbar: React.FC<NavbarProps> = ({
           >
             <UserPlus size={18} />
             <span className="text-sm font-medium">Ingreso</span>
+          </button>
+
+          <button
+            onClick={() => onChangeView('csv-upload')}
+            className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
+              activeView === 'csv-upload'
+                ? 'bg-white/10 border-white/20 text-white shadow-lg'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Upload size={18} />
+            <span className="text-sm font-medium">Carga CSV</span>
           </button>
         </nav>
 
@@ -129,7 +141,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
       {/* MOBILE BOTTOM NAV */}
       <nav className="md:hidden fixed bottom-6 left-4 right-4 z-40">
-        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-2 flex justify-center">
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-2 flex justify-center gap-4">
           <button
             onClick={() => onChangeView('registration')}
             className="flex flex-col items-center justify-center min-w-[50px] py-2 transition-all duration-300 group"
@@ -142,6 +154,22 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className={`mt-1.5 rounded-full transition-all duration-300 ${
               activeView === 'registration'
                 ? 'w-1.5 h-1.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]'
+                : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
+            }`} />
+          </button>
+
+          <button
+            onClick={() => onChangeView('csv-upload')}
+            className="flex flex-col items-center justify-center min-w-[50px] py-2 transition-all duration-300 group"
+          >
+            <div className={`transition-all duration-300 transform ${
+              activeView === 'csv-upload' ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
+            }`}>
+              <Upload size={activeView === 'csv-upload' ? 24 : 20} strokeWidth={activeView === 'csv-upload' ? 2.5 : 2} />
+            </div>
+            <div className={`mt-1.5 rounded-full transition-all duration-300 ${
+              activeView === 'csv-upload'
+                ? 'w-1.5 h-1.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
                 : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
             }`} />
           </button>
