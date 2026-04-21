@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Navbar from '../../components/Navbar/Navbar';
 import WelcomeView from '../Welcome/WelcomeView';
 import RegistrationView from '../Registration/RegistrationView/RegistrationView';
+import Statistics from '../Statistics/Statistics'
 import './Layout.css';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -19,6 +20,11 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     setActiveView('registration');
   };
 
+  // Solo cambia el contexto, sin tocar la vista activa
+  const handleContextSwitch = (program: 'TRIBU' | 'SOROCA') => {
+    setAppContext(program);
+  };
+
   const handleLogoClick = () => {
     setActiveView('welcome');
     setAppContext('GLOBAL');
@@ -31,7 +37,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
 
   const renderContent = () => {
     if (activeView === 'welcome') return <WelcomeView onSelectProgram={handleSelectProgram} />;
-    if (activeView === 'registration') return <RegistrationView context={appContext} onChangeProgram={handleChangeProgram} />;
+    if (activeView === 'registration') return <RegistrationView key={appContext} context={appContext} onChangeProgram={handleChangeProgram} />;
+    if (activeView === 'estadisticas') return <Statistics context={appContext} />;
     return null;
   };
 
@@ -42,7 +49,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
         onChangeView={setActiveView}
         onLogoClick={handleLogoClick}
         context={appContext}
-        onContextSwitch={handleSelectProgram}
+        onContextSwitch={handleContextSwitch}
         onLogout={onLogout}
       />
 

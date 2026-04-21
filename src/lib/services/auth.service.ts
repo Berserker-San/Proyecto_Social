@@ -46,7 +46,7 @@ export async function getCurrentUsuarioSistema() {
     .from('usuario_sistema')
     .select(`
       *,
-      roles:usuario_rol(
+      roles:usuario_rol!usuario_id(
         rol(*)
       )
     `)
@@ -54,6 +54,7 @@ export async function getCurrentUsuarioSistema() {
     .single();
 
   if (error) throw error;
+  
   return data as UsuarioSistema & { roles: any[] };
 }
 
@@ -64,7 +65,7 @@ export async function hasRole(roleCodigo: string): Promise<boolean> {
   const usuario = await getCurrentUsuarioSistema();
   if (!usuario) return false;
 
-  return usuario.roles.some((ur: any) => ur.rol.codigo === roleCodigo);
+  return usuario.roles.some((rol: any) => rol.codigo === roleCodigo);
 }
 
 /**
