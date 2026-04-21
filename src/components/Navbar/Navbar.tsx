@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, Shield, ArrowLeftRight, LogOut } from 'lucide-react';
+import { UserPlus, Shield, ArrowLeftRight, LogOut, BarChart2 } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../customIcons/customIcons';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -62,6 +62,17 @@ const Navbar: React.FC<NavbarProps> = ({
           >
             <UserPlus size={18} />
             <span className="text-sm font-medium">Ingreso</span>
+          </button>
+          <button
+            onClick={() => onChangeView('estadisticas')}
+            className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
+              activeView === 'estadisticas'
+                ? 'bg-white/10 border-white/20 text-white shadow-lg'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <BarChart2 size={18} />
+            <span className="text-sm font-medium">Estadísticas</span>
           </button>
         </nav>
 
