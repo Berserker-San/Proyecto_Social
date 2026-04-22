@@ -16,3 +16,6 @@ export * from './perfiles.service';
 
 // Catálogos
 export * from './catalogos.service';
+
+// Estadísticas
+export * from './estadisticas.service';

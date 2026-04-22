@@ -70,7 +70,7 @@ export async function hasRole(roleCodigo: string): Promise<boolean> {
   const usuario = await getCurrentUsuarioSistema();
   if (!usuario) return false;
 
-  return usuario.roles.some((ur: any) => ur.rol.codigo === roleCodigo);
+  return usuario.roles.some((rol: any) => rol.codigo === roleCodigo);
 }
 
 /**
