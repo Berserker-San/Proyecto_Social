@@ -120,8 +120,9 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
       }
 
       setSuccessMsg(`¡Valiente ${formData.firstName} ${formData.lastName} registrado exitosamente!`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       
-      // Limpiar formulario después de 2 segundos
+      // Limpiar formulario después de 4 segundos
       setTimeout(() => {
         setFormData({
           discipline: 'ULTIMATE',
@@ -135,7 +136,7 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
           motivation: '', terms: false,
         });
         setSuccessMsg(null);
-      }, 3000);
+      }, 4000);
 
     } catch (error: any) {
       console.error('Error al registrar valiente:', error);

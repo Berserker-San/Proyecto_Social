@@ -42,19 +42,25 @@ export async function getCurrentUsuarioSistema() {
   const authUser = await getCurrentAuthUser();
   if (!authUser) return null;
 
-  const { data, error } = await supabase
+  // Paso 1: obtener usuario del sistema
+  const { data: usuario, error: usuarioError } = await supabase
     .from('usuario_sistema')
-    .select(`
-      *,
-      roles:usuario_rol(
-        rol(*)
-      )
-    `)
+    .select('*')
     .eq('auth_user_id', authUser.id)
     .single();
 
-  if (error) throw error;
-  return data as UsuarioSistema & { roles: any[] };
+  if (usuarioError) throw usuarioError;
+  if (!usuario) return null;
+
+  // Paso 2: obtener roles del usuario
+  const { data: usuarioRoles, error: rolesError } = await supabase
+    .from('usuario_rol')
+    .select('rol(*)')
+    .eq('usuario_id', usuario.id);
+
+  if (rolesError) throw rolesError;
+
+  return { ...usuario, roles: usuarioRoles ?? [] } as UsuarioSistema & { roles: any[] };
 }
 
 /**
