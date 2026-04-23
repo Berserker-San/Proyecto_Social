@@ -222,3 +222,115 @@ export async function getResumenEstadisticas(): Promise<ResumenEstadisticas> {
     porRangoEdad,
   };
 }
+
+// =========================================================
+// ESTADÍSTICAS POR OCUPACIÓN
+// Distribución de trabaja_estudia en la tabla valiente.
+// =========================================================
+
+export interface EstadisticaOcupacion {
+  ocupacion: string;
+  total: number;
+  porcentaje: number;
+}
+
+export async function getEstadisticasPorOcupacion(): Promise<EstadisticaOcupacion[]> {
+  const { data, error } = await supabase
+    .from('valiente')
+    .select('trabaja_estudia')
+    .eq('estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const ocupacion = row.trabaja_estudia ?? 'No especificado';
+    conteo[ocupacion] = (conteo[ocupacion] ?? 0) + 1;
+  }
+
+  const total = Object.values(conteo).reduce((sum, n) => sum + n, 0);
+
+  return Object.entries(conteo)
+    .map(([ocupacion, cantidad]) => ({
+      ocupacion,
+      total: cantidad,
+      porcentaje: total > 0 ? Math.round((cantidad / total) * 100 * 10) / 10 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// =========================================================
+// ESTADÍSTICAS POR ESCOLARIDAD
+// Distribución de nivel_educativo en valiente_educacion.
+// =========================================================
+
+export interface EstadisticaEscolaridad {
+  nivel: string;
+  total: number;
+}
+
+export async function getEstadisticasPorEscolaridad(): Promise<EstadisticaEscolaridad[]> {
+  const { data, error } = await supabase
+    .from('valiente_educacion')
+    .select(`
+      nivel_educativo,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const nivel = row.nivel_educativo ?? 'No registrado';
+    conteo[nivel] = (conteo[nivel] ?? 0) + 1;
+  }
+
+  const ORDER = ['Primaria', 'Secundaria', 'Técnico', 'Tecnólogo', 'Profesional universitario', 'Posgrado'];
+
+  return Object.entries(conteo)
+    .map(([nivel, total]) => ({ nivel, total }))
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a.nivel);
+      const ib = ORDER.indexOf(b.nivel);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.nivel.localeCompare(b.nivel);
+    });
+}
+
+// =========================================================
+// ESTADÍSTICAS POR COMUNA
+// Concentración geográfica por comuna_id en valiente_ubicacion.
+// =========================================================
+
+export interface EstadisticaComuna {
+  comuna: string;
+  total: number;
+}
+
+export async function getEstadisticasPorComuna(): Promise<EstadisticaComuna[]> {
+  const { data, error } = await supabase
+    .from('valiente_ubicacion')
+    .select(`
+      comuna_id,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const comuna = row.comuna_id ? String(row.comuna_id) : 'No registrada';
+    conteo[comuna] = (conteo[comuna] ?? 0) + 1;
+  }
+
+  return Object.entries(conteo)
+    .map(([comuna, total]) => ({ comuna, total }))
+    .sort((a, b) => b.total - a.total);
+}
