@@ -4,15 +4,17 @@ import WelcomeView from '../Welcome/WelcomeView';
 import RegistrationView from '../Registration/RegistrationView/RegistrationView';
 import CSVUploader from '../../components/CSVUploader/CSVUploader';
 import Statistics from '../Statistics/Statistics';
+import Attendance from '../Attendance/Attendance';
 import './Layout.css';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
 
 interface LayoutProps {
   onLogout?: () => void;
+  usuarioId?: string | null;
 }
 
-const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
+const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
   const [activeView, setActiveView] = useState('welcome');
   const [appContext, setAppContext] = useState<AppContext>('GLOBAL');
 
@@ -48,6 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     }
     if (activeView === 'csv-upload') return <CSVUploader onBack={() => setActiveView('welcome')} />;
     if (activeView === 'estadisticas') return <Statistics context={appContext} />;
+    if (activeView === 'attendance')   return <Attendance usuarioId={usuarioId} />;
     return null;
   };
 

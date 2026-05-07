@@ -443,3 +443,23 @@ export const ROL_CODIGO = {
   ACOMPANANTE: 'ACOMPAÑANTE',
   VALIENTE: 'VALIENTE',
 } as const;
+
+// =========================================================
+// EVENTOS Y ASISTENCIA
+// =========================================================
+
+export interface Evento {
+  id: number;
+  nombre_evento: string;
+  creado_por: string | null;   // uuid → usuario_sistema.id
+  fecha: string;               // date
+  hora: string | null;         // time
+  created_at?: string;
+}
+
+export interface Asistencia {
+  id: number;
+  evento_id: number;
+  valiente_id: number;
+  estado: string;              // 'Presente' | 'Ausente' | 'Justificado'
+}

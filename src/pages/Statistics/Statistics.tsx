@@ -3,6 +3,9 @@ import { Globe, Users, AlertTriangle, Briefcase, BarChart2, Heart, Brain, Trendi
 import { getResumenEstadisticas } from '../../lib/services/estadisticas.service';
 import DemographicsTab from '../../components/tabs/DemographicsTab';
 import VitalContextTab from '../../components/tabs/VitalContextTab';
+import HealthTab from '../../components/tabs/HealthTab';
+import FamilyContextTab from '../../components/tabs/FamilyContextTab';
+import SportsCultureTab from '../../components/tabs/SportsCultureTab';
 import './Statistics.css';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -12,9 +15,9 @@ type Tab = 'demografia' | 'contexto' | 'capital' | 'logistica' | 'nahual';
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'demografia', label: 'Demografía',        icon: <Users size={14} />      },
   { key: 'contexto',   label: 'Contexto Vital',    icon: <Globe size={14} />      },
-  { key: 'capital',    label: 'Capital Humano',    icon: <TrendingUp size={14} /> },
+  { key: 'capital',    label: 'Entorno Familiar',   icon: <TrendingUp size={14} /> },
   { key: 'logistica',  label: 'Logística y Salud', icon: <Activity size={14} />   },
-  { key: 'nahual',     label: 'Nahual (Psico)',    icon: <Brain size={14} />      },
+  { key: 'nahual',     label: 'Deporte y Cultura', icon: <Brain size={14} />      },
 ];
 
 const Statistics: React.FC<StatisticsProps> = () => {
@@ -104,22 +107,9 @@ const Statistics: React.FC<StatisticsProps> = () => {
       {/* TAB CONTENT */}
       {activeTab === 'demografia' && <DemographicsTab />}
       {activeTab === 'contexto'   && <VitalContextTab />}
-
-      {activeTab !== 'demografia' && activeTab !== 'contexto' && (
-        <div className="stats-charts-grid">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="stats-chart-card">
-              <div className="stats-chart-header">
-                <span className="stats-chart-title"><BarChart2 size={14} /> PRÓXIMAMENTE</span>
-              </div>
-              <div className="stats-chart-placeholder">
-                <BarChart2 size={32} className="stats-chart-placeholder-icon" />
-                <span>Próximamente</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {activeTab === 'capital'    && <FamilyContextTab />}
+      {activeTab === 'logistica'  && <HealthTab />}
+      {activeTab === 'nahual'     && <SportsCultureTab />}
 
     </div>
   );

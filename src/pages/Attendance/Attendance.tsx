@@ -1,0 +1,344 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  CalendarPlus, ChevronLeft, Users, CheckCircle2,
+  XCircle, Clock, Search, Loader2, Trash2, Calendar,
+} from 'lucide-react';
+import { getEventos, crearEvento, eliminarEvento, getAsistenciaEvento, upsertAsistencia } from '../../lib/services/attendance.service';
+import type { Evento, Valiente } from '../../types/database.types';
+import './Attendance.css';
+
+type View = 'list' | 'take';
+
+type ValienteConAsistencia = Valiente & {
+  asistencia_estado: string | null;
+  asistencia_id: number | null;
+};
+
+const ESTADOS = ['Presente', 'Ausente', 'Justificado'] as const;
+type EstadoAsistencia = typeof ESTADOS[number];
+
+const estadoConfig: Record<EstadoAsistencia, { label: string; icon: React.ReactNode; cls: string }> = {
+  Presente:    { label: 'Presente',    icon: <CheckCircle2 size={15} />, cls: 'att-chip--present'   },
+  Ausente:     { label: 'Ausente',     icon: <XCircle size={15} />,      cls: 'att-chip--absent'    },
+  Justificado: { label: 'Justificado', icon: <Clock size={15} />,        cls: 'att-chip--justified' },
+};
+
+const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null }) => {
+  const [view,          setView]          = useState<View>('list');
+  const [eventos,       setEventos]       = useState<Evento[]>([]);
+  const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
+  const [valientes,     setValientes]     = useState<ValienteConAsistencia[]>([]);
+  const [search,        setSearch]        = useState('');
+  const [loadingList,   setLoadingList]   = useState(true);
+  const [loadingTake,   setLoadingTake]   = useState(false);
+  const [saving,        setSaving]        = useState<number | null>(null);
+  const [showForm,      setShowForm]      = useState(false);
+  const [formData,      setFormData]      = useState({ nombre_evento: '', fecha: '', hora: '' });
+  const [formError,     setFormError]     = useState<string | null>(null);
+  const [submitting,    setSubmitting]    = useState(false);
+
+  // ── Carga eventos ──────────────────────────────────────────────────────
+  const loadEventos = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      setEventos(await getEventos());
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
+  useEffect(() => { loadEventos(); }, [loadEventos]);
+
+  // ── Abrir toma de asistencia ───────────────────────────────────────────
+  const openEvento = async (evento: Evento) => {
+    setSelectedEvento(evento);
+    setView('take');
+    setLoadingTake(true);
+    try {
+      setValientes(await getAsistenciaEvento(evento.id));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingTake(false);
+    }
+  };
+
+  // ── Marcar asistencia ─────────────────────────────────────────────────
+  const handleMark = async (valienteId: number, estado: EstadoAsistencia) => {
+    if (!selectedEvento) return;
+    setSaving(valienteId);
+    try {
+      await upsertAsistencia(selectedEvento.id, valienteId, estado);
+      setValientes(prev =>
+        prev.map(v => v.id === valienteId ? { ...v, asistencia_estado: estado } : v)
+      );
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  // ── Crear evento ──────────────────────────────────────────────────────
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.nombre_evento || !formData.fecha) {
+      setFormError('Nombre y fecha son obligatorios.');
+      return;
+    }
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      await crearEvento({
+        nombre_evento: formData.nombre_evento,
+        fecha:         formData.fecha,
+        hora:          formData.hora || null,
+        creado_por:    usuarioId,
+      });
+      setFormData({ nombre_evento: '', fecha: '', hora: '' });
+      setShowForm(false);
+      await loadEventos();
+    } catch (err: any) {
+      setFormError(err.message ?? 'Error al crear el evento.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Eliminar evento ───────────────────────────────────────────────────
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('¿Eliminar este evento y toda su asistencia?')) return;
+    try {
+      await eliminarEvento(id);
+      setEventos(prev => prev.filter(ev => ev.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ── Filtro búsqueda ───────────────────────────────────────────────────
+  const filtered = valientes.filter(v =>
+    `${v.nombres} ${v.apellidos} ${v.numero_documento}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
+
+  const presentCount    = valientes.filter(v => v.asistencia_estado === 'Presente').length;
+  const ausenteCount    = valientes.filter(v => v.asistencia_estado === 'Ausente').length;
+  const justCount       = valientes.filter(v => v.asistencia_estado === 'Justificado').length;
+  const sinMarcarCount  = valientes.filter(v => !v.asistencia_estado).length;
+
+  // ── VISTA: Lista de eventos ───────────────────────────────────────────
+  if (view === 'list') {
+    return (
+      <div className="att-root">
+
+        {/* Header */}
+        <div className="att-header">
+          <div className="att-header-left">
+            <div className="att-header-icon"><Calendar size={22} /></div>
+            <div>
+              <h1 className="att-title">Asistencia</h1>
+              <p className="att-subtitle">Gestiona eventos y toma asistencia de valientes.</p>
+            </div>
+          </div>
+          <button className="att-btn-primary" onClick={() => setShowForm(v => !v)}>
+            <CalendarPlus size={16} /> Nuevo Evento
+          </button>
+        </div>
+
+        {/* Formulario nuevo evento */}
+        {showForm && (
+          <div className="att-form-card">
+            <h3 className="att-form-title">Crear Evento</h3>
+            <form onSubmit={handleCreate} className="att-form">
+              <div className="att-form-grid">
+                <div className="att-form-group att-form-group--wide">
+                  <label className="att-label">NOMBRE DEL EVENTO</label>
+                  <input
+                    className="att-input"
+                    placeholder="Ej. Entreno Martes 4-6pm"
+                    value={formData.nombre_evento}
+                    onChange={e => setFormData(p => ({ ...p, nombre_evento: e.target.value }))}
+                  />
+                </div>
+                <div className="att-form-group">
+                  <label className="att-label">FECHA</label>
+                  <input
+                    type="date"
+                    className="att-input"
+                    value={formData.fecha}
+                    onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))}
+                  />
+                </div>
+                <div className="att-form-group">
+                  <label className="att-label">HORA (OPCIONAL)</label>
+                  <input
+                    type="time"
+                    className="att-input"
+                    value={formData.hora}
+                    onChange={e => setFormData(p => ({ ...p, hora: e.target.value }))}
+                  />
+                </div>
+              </div>
+              {formError && <p className="att-form-error">{formError}</p>}
+              <div className="att-form-actions">
+                <button type="button" className="att-btn-ghost" onClick={() => setShowForm(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="att-btn-primary" disabled={submitting}>
+                  {submitting ? <Loader2 size={15} className="att-spin" /> : <CalendarPlus size={15} />}
+                  Crear
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Lista */}
+        {loadingList ? (
+          <div className="att-loading">
+            <Loader2 size={28} className="att-spin" />
+            <span>Cargando eventos…</span>
+          </div>
+        ) : eventos.length === 0 ? (
+          <div className="att-empty">
+            <Calendar size={40} />
+            <p>No hay eventos aún. Crea el primero.</p>
+          </div>
+        ) : (
+          <div className="att-event-list">
+            {eventos.map(ev => (
+              <div key={ev.id} className="att-event-card" onClick={() => openEvento(ev)}>
+                <div className="att-event-date">
+                  <span className="att-event-day">
+                    {new Date(ev.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                  </span>
+                  {ev.hora && (
+                    <span className="att-event-time">
+                      {ev.hora.slice(0, 5)}
+                    </span>
+                  )}
+                </div>
+                <div className="att-event-info">
+                  <span className="att-event-name">{ev.nombre_evento}</span>
+                  <span className="att-event-meta">
+                    {new Date(ev.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </span>
+                </div>
+                <div className="att-event-actions">
+                  <button
+                    className="att-btn-take"
+                    onClick={e => { e.stopPropagation(); openEvento(ev); }}
+                  >
+                    <Users size={14} /> Tomar asistencia
+                  </button>
+                  <button className="att-btn-delete" onClick={e => handleDelete(ev.id, e)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── VISTA: Toma de asistencia ─────────────────────────────────────────
+  return (
+    <div className="att-root">
+
+      {/* Header */}
+      <div className="att-header">
+        <div className="att-header-left">
+          <button className="att-btn-back" onClick={() => setView('list')}>
+            <ChevronLeft size={18} />
+          </button>
+          <div>
+            <h1 className="att-title">{selectedEvento?.nombre_evento}</h1>
+            <p className="att-subtitle">
+              {selectedEvento && new Date(selectedEvento.fecha + 'T00:00:00').toLocaleDateString('es-CO', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+              })}
+              {selectedEvento?.hora && ` · ${selectedEvento.hora.slice(0, 5)}`}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Resumen */}
+      <div className="att-summary">
+        <div className="att-summary-chip att-summary-chip--present">
+          <CheckCircle2 size={14} /> {presentCount} Presentes
+        </div>
+        <div className="att-summary-chip att-summary-chip--absent">
+          <XCircle size={14} /> {ausenteCount} Ausentes
+        </div>
+        <div className="att-summary-chip att-summary-chip--justified">
+          <Clock size={14} /> {justCount} Justificados
+        </div>
+        <div className="att-summary-chip att-summary-chip--pending">
+          <Users size={14} /> {sinMarcarCount} Sin marcar
+        </div>
+      </div>
+
+      {/* Búsqueda */}
+      <div className="att-search-wrap">
+        <Search size={15} className="att-search-icon" />
+        <input
+          className="att-search"
+          placeholder="Buscar por nombre o documento…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Lista valientes */}
+      {loadingTake ? (
+        <div className="att-loading">
+          <Loader2 size={28} className="att-spin" />
+          <span>Cargando valientes…</span>
+        </div>
+      ) : (
+        <div className="att-valiente-list">
+          {filtered.map(v => (
+            <div key={v.id} className="att-valiente-row">
+              <div className="att-valiente-avatar">
+                {v.nombres.charAt(0)}{v.apellidos.charAt(0)}
+              </div>
+              <div className="att-valiente-info">
+                <span className="att-valiente-name">{v.nombres} {v.apellidos}</span>
+                <span className="att-valiente-doc">{v.tipo_documento} {v.numero_documento}</span>
+              </div>
+              <div className="att-chips">
+                {saving === v.id ? (
+                  <Loader2 size={18} className="att-spin" />
+                ) : (
+                  ESTADOS.map(estado => {
+                    const cfg = estadoConfig[estado];
+                    const active = v.asistencia_estado === estado;
+                    return (
+                      <button
+                        key={estado}
+                        className={`att-chip ${cfg.cls}${active ? ' att-chip--active' : ''}`}
+                        onClick={() => handleMark(v.id, estado)}
+                      >
+                        {cfg.icon} {cfg.label}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Attendance;
