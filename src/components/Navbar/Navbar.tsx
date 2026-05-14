@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, Shield, ArrowLeftRight, LogOut, BarChart2, Upload, ClipboardList } from 'lucide-react';
+import { UserPlus, Shield, ArrowLeftRight, LogOut, BarChart2, Upload, ClipboardList, Users } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../customIcons/customIcons';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -29,6 +29,9 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { sidebar, accent } = contextStyles[context];
 
+  const isDirectoryActive =
+    activeView === 'directorio' || activeView === 'valientes-directory';
+
   return (
     <>
       {/* DESKTOP SIDEBAR */}
@@ -50,7 +53,7 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 px-6 py-2 space-y-2">
+        <nav className="flex-1 px-6 py-2 space-y-2 flex flex-col min-h-0">
           <button
             onClick={() => onChangeView('registration')}
             className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
@@ -86,6 +89,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <BarChart2 size={18} />
             <span className="text-sm font-medium">Estadísticas</span>
           </button>
+
           <button
             onClick={() => onChangeView('attendance')}
             className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
@@ -96,6 +100,19 @@ const Navbar: React.FC<NavbarProps> = ({
           >
             <ClipboardList size={18} />
             <span className="text-sm font-medium">Asistencia</span>
+          </button>
+
+          {/* Botón Directorio */}
+          <button
+            onClick={() => onChangeView('directorio')}
+            className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
+              isDirectoryActive
+                ? 'bg-white/10 border-white/20 text-white shadow-lg'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Users size={18} />
+            <span className="text-sm font-medium">Directorio</span>
           </button>
         </nav>
 
@@ -219,6 +236,27 @@ const Navbar: React.FC<NavbarProps> = ({
               className={`mt-1.5 rounded-full transition-all duration-300 ${
                 activeView === 'estadisticas'
                   ? 'w-1.5 h-1.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+                  : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
+              }`}
+            />
+          </button>
+
+          {/* Botón Directorio en mobile */}
+          <button
+            onClick={() => onChangeView('directorio')}
+            className="flex flex-col items-center justify-center min-w-[50px] py-2 transition-all duration-300 group"
+          >
+            <div
+              className={`transition-all duration-300 transform ${
+                isDirectoryActive ? '-translate-y-1 text-white' : 'text-slate-500 group-hover:text-slate-300'
+              }`}
+            >
+              <Users size={isDirectoryActive ? 24 : 20} strokeWidth={isDirectoryActive ? 2.5 : 2} />
+            </div>
+            <div
+              className={`mt-1.5 rounded-full transition-all duration-300 ${
+                isDirectoryActive
+                  ? 'w-1.5 h-1.5 bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]'
                   : 'w-1 h-1 bg-slate-700 group-hover:bg-slate-500'
               }`}
             />

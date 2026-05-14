@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar/Navbar';
 import WelcomeView from '../Welcome/WelcomeView';
 import RegistrationView from '../Registration/RegistrationView/RegistrationView';
 import CSVUploader from '../../components/CSVUploader/CSVUploader';
 import Statistics from '../Statistics/Statistics';
 import Attendance from '../Attendance/Attendance';
+import ValienteProfileView from '../ValienteProfile/ValienteProfileView';
+import ValientesListView from '../ValienteProfile/ValientesListView';
+import { getValientes } from '../../lib/services/valientes.service';
+import type { Valiente } from '../../types/database.types';
 import './Layout.css';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -17,6 +21,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
   const [activeView, setActiveView] = useState('welcome');
   const [appContext, setAppContext] = useState<AppContext>('GLOBAL');
+  const [selectedValienteId, setSelectedValienteId] = useState<number | null>(null);
+  const [allValientes, setAllValientes] = useState<Valiente[]>([]);
 
   const handleSelectProgram = (program: 'TRIBU' | 'SOROCA') => {
     setAppContext(program);
@@ -37,6 +43,15 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
     setActiveView('registration');
   };
 
+  const handleSelectValiente = (id: number) => {
+    setSelectedValienteId(id);
+    setActiveView('valientes-directory');
+  };
+
+  useEffect(() => {
+    getValientes().then(setAllValientes).catch(() => {});
+  }, []);
+
   const renderContent = () => {
     if (activeView === 'welcome') return <WelcomeView onSelectProgram={handleSelectProgram} />;
     if (activeView === 'registration') {
@@ -51,6 +66,28 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
     if (activeView === 'csv-upload') return <CSVUploader onBack={() => setActiveView('welcome')} />;
     if (activeView === 'estadisticas') return <Statistics context={appContext} />;
     if (activeView === 'attendance')   return <Attendance usuarioId={usuarioId} />;
+    if (activeView === 'directorio') {
+      return (
+        <ValientesListView
+          onSelectValiente={handleSelectValiente}
+          context={appContext}
+        />
+      );
+    }
+    if (activeView === 'valientes-directory' && selectedValienteId !== null) {
+      return (
+        <ValienteProfileView
+          valienteId={selectedValienteId}
+          allValientes={allValientes}
+          onSelectValiente={handleSelectValiente}
+          onBack={() => {
+            setSelectedValienteId(null);
+            setActiveView('directorio');
+          }}
+          context={appContext}
+        />
+      );
+    }
     return null;
   };
 
