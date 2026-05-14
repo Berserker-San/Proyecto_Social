@@ -222,3 +222,416 @@ export async function getResumenEstadisticas(): Promise<ResumenEstadisticas> {
     porRangoEdad,
   };
 }
+
+// =========================================================
+// ESTADÍSTICAS POR OCUPACIÓN
+// Distribución de trabaja_estudia en la tabla valiente.
+// =========================================================
+
+export interface EstadisticaOcupacion {
+  ocupacion: string;
+  total: number;
+  porcentaje: number;
+}
+
+export async function getEstadisticasPorOcupacion(): Promise<EstadisticaOcupacion[]> {
+  const { data, error } = await supabase
+    .from('valiente')
+    .select('trabaja_estudia')
+    .eq('estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const ocupacion = row.trabaja_estudia ?? 'No especificado';
+    conteo[ocupacion] = (conteo[ocupacion] ?? 0) + 1;
+  }
+
+  const total = Object.values(conteo).reduce((sum, n) => sum + n, 0);
+
+  return Object.entries(conteo)
+    .map(([ocupacion, cantidad]) => ({
+      ocupacion,
+      total: cantidad,
+      porcentaje: total > 0 ? Math.round((cantidad / total) * 100 * 10) / 10 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// =========================================================
+// ESTADÍSTICAS POR ESCOLARIDAD
+// Distribución de nivel_educativo en valiente_educacion.
+// =========================================================
+
+export interface EstadisticaEscolaridad {
+  nivel: string;
+  total: number;
+}
+
+export async function getEstadisticasPorEscolaridad(): Promise<EstadisticaEscolaridad[]> {
+  const { data, error } = await supabase
+    .from('valiente_educacion')
+    .select(`
+      nivel_educativo,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const nivel = row.nivel_educativo ?? 'No registrado';
+    conteo[nivel] = (conteo[nivel] ?? 0) + 1;
+  }
+
+  const ORDER = ['Primaria', 'Secundaria', 'Técnico', 'Tecnólogo', 'Profesional universitario', 'Posgrado'];
+
+  return Object.entries(conteo)
+    .map(([nivel, total]) => ({ nivel, total }))
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a.nivel);
+      const ib = ORDER.indexOf(b.nivel);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.nivel.localeCompare(b.nivel);
+    });
+}
+
+// =========================================================
+// ESTADÍSTICAS POR COMUNA
+// Concentración geográfica por comuna_id en valiente_ubicacion.
+// =========================================================
+
+export interface EstadisticaComuna {
+  comuna: string;
+  total: number;
+}
+
+export async function getEstadisticasPorComuna(): Promise<EstadisticaComuna[]> {
+  const { data, error } = await supabase
+    .from('valiente_ubicacion')
+    .select(`
+      comuna_id,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const comuna = row.comuna_id ? String(row.comuna_id) : 'No registrada';
+    conteo[comuna] = (conteo[comuna] ?? 0) + 1;
+  }
+
+  return Object.entries(conteo)
+    .map(([comuna, total]) => ({ comuna, total }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// =========================================================
+// ESTADÍSTICAS SALUD Y BIENESTAR
+// Distribución de discapacidad, alergias y tratamiento médico.
+// =========================================================
+
+export interface EstadisticaSaludItem {
+  categoria: string;  // "Sí" | "No"
+  total: number;
+  porcentaje: number;
+}
+
+export interface EstadisticaSalud {
+  discapacidad: EstadisticaSaludItem[];
+  alergia: EstadisticaSaludItem[];
+  tratamiento: EstadisticaSaludItem[];
+}
+
+export async function getEstadisticasSalud(): Promise<EstadisticaSalud> {
+  const { data, error } = await supabase
+    .from('valiente_salud')
+    .select(`
+      tiene_discapacidad,
+      tiene_alergias,
+      tratamiento_en_curso,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const total = rows.length;
+
+  const toItems = (siCount: number): EstadisticaSaludItem[] => {
+    const noCount = total - siCount;
+    return [
+      { categoria: 'Sí', total: siCount, porcentaje: total > 0 ? Math.round((siCount / total) * 1000) / 10 : 0 },
+      { categoria: 'No', total: noCount, porcentaje: total > 0 ? Math.round((noCount / total) * 1000) / 10 : 0 },
+    ];
+  };
+
+  const discapacidadSi  = rows.filter(r => r.tiene_discapacidad === true).length;
+  const alergiaSi       = rows.filter(r => r.tiene_alergias === true).length;
+  const tratamientoSi   = rows.filter(r => r.tratamiento_en_curso !== null && r.tratamiento_en_curso !== '').length;
+
+  return {
+    discapacidad: toItems(discapacidadSi),
+    alergia:      toItems(alergiaSi),
+    tratamiento:  toItems(tratamientoSi),
+  };
+}
+
+// =========================================================
+// ESTADÍSTICAS ENTORNO FAMILIAR Y SOCIOECONÓMICO
+// Tablas: valiente_contexto_familiar
+// =========================================================
+
+export interface EstadisticaPersonasHogar {
+  cantidad: string;
+  total: number;
+}
+
+export interface EstadisticaIngreso {
+  rango: string;
+  total: number;
+}
+
+export interface EstadisticaConflicto {
+  categoria: string;
+  total: number;
+  porcentaje: number;
+}
+
+export interface EstadisticaEtnia {
+  etnia: string;
+  total: number;
+  porcentaje: number;
+}
+
+export async function getEstadisticasPersonasHogar(): Promise<EstadisticaPersonasHogar[]> {
+  const { data, error } = await supabase
+    .from('valiente_contexto_familiar')
+    .select(`
+      numero_personas_hogar,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const key = row.numero_personas_hogar != null ? String(row.numero_personas_hogar) : 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  return Object.entries(conteo)
+    .map(([cantidad, total]) => ({ cantidad, total }))
+    .sort((a, b) => {
+      const na = parseInt(a.cantidad), nb = parseInt(b.cantidad);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.cantidad.localeCompare(b.cantidad);
+    });
+}
+
+export async function getEstadisticasIngresos(): Promise<EstadisticaIngreso[]> {
+  const { data, error } = await supabase
+    .from('valiente_contexto_familiar')
+    .select(`
+      ingreso_mensual_hogar,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const key = row.ingreso_mensual_hogar ?? 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  const ORDER = ['Menos de 1 SMMLV', '1 SMMLV', '2 SMMLV', 'Más de 2 SMMLV'];
+
+  return Object.entries(conteo)
+    .map(([rango, total]) => ({ rango, total }))
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a.rango), ib = ORDER.indexOf(b.rango);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.rango.localeCompare(b.rango);
+    });
+}
+
+export async function getEstadisticasConflicto(): Promise<EstadisticaConflicto[]> {
+  const { data, error } = await supabase
+    .from('valiente_contexto_familiar')
+    .select(`
+      es_victima_conflicto,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const total = rows.length;
+  const siCount = rows.filter(r => r.es_victima_conflicto === true).length;
+  const noCount = total - siCount;
+
+  return [
+    { categoria: 'Sí', total: siCount, porcentaje: total > 0 ? Math.round((siCount / total) * 1000) / 10 : 0 },
+    { categoria: 'No', total: noCount, porcentaje: total > 0 ? Math.round((noCount / total) * 1000) / 10 : 0 },
+  ];
+}
+
+export async function getEstadisticasEtnia(): Promise<EstadisticaEtnia[]> {
+  const { data, error } = await supabase
+    .from('valiente_contexto_familiar')
+    .select(`
+      etnia,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const key = row.etnia ?? 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  const total = Object.values(conteo).reduce((s, n) => s + n, 0);
+
+  return Object.entries(conteo)
+    .map(([etnia, cantidad]) => ({
+      etnia,
+      total: cantidad,
+      porcentaje: total > 0 ? Math.round((cantidad / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// =========================================================
+// ESTADÍSTICAS DEPORTE Y CULTURA
+// Tabla: valiente_perfil_deportivo
+// =========================================================
+
+export interface EstadisticaTalla {
+  talla: string;
+  total: number;
+}
+
+export interface EstadisticaEntreno {
+  dia: string;
+  total: number;
+}
+
+export async function getEstadisticasTallaCamisa(): Promise<EstadisticaTalla[]> {
+  const { data, error } = await supabase
+    .from('valiente_perfil_deportivo')
+    .select(`
+      talla_camisa,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const key = row.talla_camisa ?? 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  return Object.entries(conteo)
+    .map(([talla, total]) => ({ talla, total }))
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a.talla), ib = ORDER.indexOf(b.talla);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.talla.localeCompare(b.talla);
+    });
+}
+
+export async function getEstadisticasTallaGuayos(): Promise<EstadisticaTalla[]> {
+  const { data, error } = await supabase
+    .from('valiente_perfil_deportivo')
+    .select(`
+      talla_guayos,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO')
+    .not('talla_guayos', 'is', null);
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const key = row.talla_guayos ?? 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  return Object.entries(conteo)
+    .map(([talla, total]) => ({ talla, total }))
+    .sort((a, b) => {
+      const na = parseInt(a.talla), nb = parseInt(b.talla);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.talla.localeCompare(b.talla);
+    });
+}
+
+export async function getEstadisticasEntrenos(): Promise<EstadisticaEntreno[]> {
+  const { data, error } = await supabase
+    .from('valiente_perfil_deportivo')
+    .select(`
+      horario_entrenamiento,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO')
+    .not('horario_entrenamiento', 'is', null);
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+
+  for (const row of data ?? []) {
+    const horario = row.horario_entrenamiento;
+    // horario puede ser un array de strings o un objeto; normalizamos ambos casos
+    const dias: string[] = Array.isArray(horario)
+      ? horario
+      : typeof horario === 'object' && horario !== null
+        ? Object.values(horario as Record<string, string>)
+        : [];
+
+    for (const dia of dias) {
+      if (typeof dia === 'string' && dia.trim()) {
+        conteo[dia] = (conteo[dia] ?? 0) + 1;
+      }
+    }
+  }
+
+  const ORDER = ['Lunes 4-6pm', 'Martes 4-6pm', 'Miércoles 4-6pm', 'Viernes 4-6pm', 'Sábados 8-10am'];
+
+  return Object.entries(conteo)
+    .map(([dia, total]) => ({ dia, total }))
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a.dia), ib = ORDER.indexOf(b.dia);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.dia.localeCompare(b.dia);
+    });
+}
