@@ -143,6 +143,7 @@ export interface Valiente {
   
   // Ubicación de Nacimiento
   lugar_nacimiento: string | null;
+  lugar_nacimiento_ciudad_id: number | null;
   nacionalidad: string | null;
   
   // Estado
@@ -209,6 +210,8 @@ export interface ValienteSalud {
   valiente_id: number;
   eps_id: number | null;
   ips_id: number | null;
+  // IPS como texto libre (catálogo vacío)
+  ips_nombre: string | null;
   tipo_sangre: string | null;
   tiene_discapacidad: boolean;
   tipo_discapacidad: string | null;

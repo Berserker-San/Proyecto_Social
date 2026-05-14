@@ -24,7 +24,7 @@ Aplicación web para el registro y seguimiento de participantes (valientes) en l
 2. Crear `.env.local` en la raíz con las variables de Supabase:
    ```
    VITE_SUPABASE_URL=tu_url
-   VITE_SUPABASE_ANON_KEY=tu_anon_key
+   VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=tu_anon_key
    ```
 
 3. Correr en desarrollo:

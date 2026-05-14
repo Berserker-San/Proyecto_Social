@@ -55,6 +55,7 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         email: null,
         redes_sociales: null,
         lugar_nacimiento: null,
+        lugar_nacimiento_ciudad_id: null,
         nacionalidad: 'Colombiana',
         estado: 'ACTIVO',
         foto_url: null,
