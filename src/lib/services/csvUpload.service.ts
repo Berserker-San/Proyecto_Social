@@ -1,11 +1,9 @@
 // =========================================================
-// CSV UPLOAD SERVICE — dedup + inserción por lotes en Supabase
+// CSV UPLOAD SERVICE — dedup + inserción en todas las tablas
 // =========================================================
 
 import { supabase } from '../supabase';
-import type { ValienteCSVRow, RowError } from '../csv/csvParser';
-
-const BATCH_SIZE = 50;
+import type { ParsedRow, RowError } from '../csv/csvParser';
 
 export interface UploadReport {
   totalRows: number;
@@ -16,8 +14,84 @@ export interface UploadReport {
   failed: RowError[];
 }
 
+// ── Helpers: resolver EPS e IPS por nombre (upsert-like) ──────────────────────
+
+async function resolveEpsId(epsNombre: string | null): Promise<number | null> {
+  if (!epsNombre?.trim()) return null;
+
+  const { data } = await supabase
+    .from('eps')
+    .select('id')
+    .ilike('nombre', epsNombre.trim())
+    .maybeSingle();
+
+  if (data) return data.id;
+
+  const { data: inserted, error } = await supabase
+    .from('eps')
+    .insert({ nombre: epsNombre.trim() })
+    .select('id')
+    .single();
+
+  if (error || !inserted) {
+    console.error('[csvUpload] resolveEpsId insert error:', error?.message);
+    return null;
+  }
+  return inserted.id;
+}
+
+async function resolveIpsId(ipsNombre: string | null): Promise<number | null> {
+  if (!ipsNombre?.trim()) return null;
+
+  const { data } = await supabase
+    .from('ips')
+    .select('id')
+    .ilike('nombre', ipsNombre.trim())
+    .maybeSingle();
+
+  if (data) return data.id;
+
+  const { data: inserted, error } = await supabase
+    .from('ips')
+    .insert({ nombre: ipsNombre.trim() })
+    .select('id')
+    .single();
+
+  if (error || !inserted) {
+    console.error('[csvUpload] resolveIpsId insert error:', error?.message);
+    return null;
+  }
+  return inserted.id;
+}
+
+async function resolveInstitucionId(nombre: string | null): Promise<number | null> {
+  if (!nombre?.trim()) return null;
+
+  const { data } = await supabase
+    .from('institucion_educativa')
+    .select('id')
+    .ilike('nombre', nombre.trim())
+    .maybeSingle();
+
+  if (data) return data.id;
+
+  const { data: inserted, error } = await supabase
+    .from('institucion_educativa')
+    .insert({ nombre: nombre.trim() })
+    .select('id')
+    .single();
+
+  if (error || !inserted) {
+    console.error('[csvUpload] resolveInstitucionId insert error:', error?.message);
+    return null;
+  }
+  return inserted.id;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 export async function insertValientesBatch(
-  rows: ValienteCSVRow[],
+  rows: ParsedRow[],
   onProgress?: (processed: number, total: number) => void
 ): Promise<UploadReport> {
   const report: UploadReport = {
@@ -32,51 +106,168 @@ export async function insertValientesBatch(
   if (rows.length === 0) return report;
 
   // 1. Dedup contra BD: una sola consulta para todos los documentos
-  const allDocNums = rows.map(r => r.numero_documento);
+  const allDocNums = rows.map(r => r.valiente.numero_documento);
   const { data: existing } = await supabase
     .from('valiente')
     .select('numero_documento')
     .in('numero_documento', allDocNums);
 
-  const existingSet = new Set((existing ?? []).map((r: { numero_documento: string }) => r.numero_documento));
+  const existingSet = new Set(
+    (existing ?? []).map((r: { numero_documento: string }) => r.numero_documento)
+  );
 
   // 2. Dedup intra-archivo
   const seenInFile = new Set<string>();
-  const toInsert: ValienteCSVRow[] = [];
+  const toInsert: Array<{ row: ParsedRow; rowNumber: number }> = [];
 
   rows.forEach((row, idx) => {
     const rowNumber = idx + 2; // +2: fila 1 = encabezado
-    if (existingSet.has(row.numero_documento)) {
-      report.skipped.push({ rowNumber, numeroDocumento: row.numero_documento, reason: 'Ya existe en base de datos' });
+    const doc = row.valiente.numero_documento;
+
+    if (existingSet.has(doc)) {
+      report.skipped.push({ rowNumber, numeroDocumento: doc, reason: 'Ya existe en base de datos' });
       report.skippedCount++;
-    } else if (seenInFile.has(row.numero_documento)) {
-      report.skipped.push({ rowNumber, numeroDocumento: row.numero_documento, reason: 'Duplicado en el archivo' });
+    } else if (seenInFile.has(doc)) {
+      report.skipped.push({ rowNumber, numeroDocumento: doc, reason: 'Duplicado en el archivo' });
       report.skippedCount++;
     } else {
-      seenInFile.add(row.numero_documento);
-      toInsert.push(row);
+      seenInFile.add(doc);
+      toInsert.push({ row, rowNumber });
     }
   });
 
-  // 3. Inserción por lotes
+  // 3. Inserción de a 1 valiente a la vez para obtener el ID generado
   let processed = report.skippedCount;
 
-  for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
-    const batch = toInsert.slice(i, i + BATCH_SIZE);
+  for (const { row, rowNumber } of toInsert) {
+    const doc = row.valiente.numero_documento;
 
-    const { error } = await supabase.from('valiente').insert(batch);
+    // ── a. Insertar valiente principal ────────────────────
+    const { data: valienteData, error: valienteError } = await supabase
+      .from('valiente')
+      .insert(row.valiente)
+      .select('id')
+      .single();
 
-    if (error) {
-      batch.forEach((row) => {
-        const rowNumber = rows.indexOf(row) + 2;
-        report.failed.push({ rowNumber, numeroDocumento: row.numero_documento, reason: error.message });
-        report.failedCount++;
+    if (valienteError || !valienteData) {
+      report.failed.push({
+        rowNumber,
+        numeroDocumento: doc,
+        reason: valienteError?.message ?? 'No se obtuvo ID del valiente insertado',
       });
-    } else {
-      report.insertedCount += batch.length;
+      report.failedCount++;
+      processed++;
+      onProgress?.(processed, rows.length);
+      continue;
     }
 
-    processed += batch.length;
+    const valienteId: number = valienteData.id;
+
+    // ── b–f. Insertar tablas relacionadas en paralelo ─────
+    const relacionadas: Promise<void>[] = [];
+
+    // b. Ubicación
+    relacionadas.push(
+      Promise.resolve(
+        supabase
+          .from('valiente_ubicacion')
+          .insert({
+            valiente_id: valienteId,
+            direccion:   row.ubicacion.direccion,
+            estrato:     row.ubicacion.estrato,
+            // ciudad_id, comuna_id, barrio_id se resuelven por nombre en el futuro
+          })
+      ).then(({ error }) => {
+        if (error) console.error(`[csvUpload] ubicacion valiente ${valienteId}:`, error.message);
+      })
+    );
+
+    // c. Salud — resolver EPS e IPS primero, luego insertar
+    relacionadas.push(
+      (async () => {
+        const [epsId, ipsId] = await Promise.all([
+          resolveEpsId(row.salud.eps_nombre),
+          resolveIpsId(row.salud.ips_nombre),
+        ]);
+        const { eps_nombre: _eps, ips_nombre: _ips, ...saludBase } = row.salud;
+        const { error } = await supabase
+          .from('valiente_salud')
+          .insert({ valiente_id: valienteId, ...saludBase, eps_id: epsId, ips_id: ipsId });
+        if (error) console.error(`[csvUpload] salud valiente ${valienteId}:`, error.message);
+      })()
+    );
+
+    // d. Educación — resolver institución primero
+    relacionadas.push(
+      (async () => {
+        const institucionId = await resolveInstitucionId(row.educacion.institucion_nombre);
+        const { institucion_nombre: _inst, ...educacionBase } = row.educacion;
+        const { error } = await supabase
+          .from('valiente_educacion')
+          .insert({ valiente_id: valienteId, ...educacionBase, institucion_id: institucionId });
+        if (error) console.error(`[csvUpload] educacion valiente ${valienteId}:`, error.message);
+      })()
+    );
+
+    // e. Ocupación
+    relacionadas.push(
+      Promise.resolve(
+        supabase
+          .from('valiente_ocupacion')
+          .insert({ valiente_id: valienteId, ...row.ocupacion })
+      ).then(({ error }) => {
+        if (error) console.error(`[csvUpload] ocupacion valiente ${valienteId}:`, error.message);
+      })
+    );
+
+    // f. Contexto familiar
+    relacionadas.push(
+      Promise.resolve(
+        supabase
+          .from('valiente_contexto_familiar')
+          .insert({ valiente_id: valienteId, ...row.contexto_familiar })
+      ).then(({ error }) => {
+        if (error) console.error(`[csvUpload] contexto_familiar valiente ${valienteId}:`, error.message);
+      })
+    );
+
+    // g. Acudiente (si existe)
+    if (row.acudiente && row.valiente_acudiente) {
+      const acudientePayload = row.acudiente;
+      const vaAcudientePayload = row.valiente_acudiente;
+
+      relacionadas.push(
+        Promise.resolve(
+          supabase
+            .from('acudiente')
+            .insert(acudientePayload)
+            .select('id')
+            .single()
+        ).then(({ data: acudienteData, error: acudienteError }) => {
+          if (acudienteError || !acudienteData) {
+            console.error(`[csvUpload] acudiente valiente ${valienteId}:`, acudienteError?.message);
+            return;
+          }
+          return Promise.resolve(
+            supabase
+              .from('valiente_acudiente')
+              .insert({
+                valiente_id:  valienteId,
+                acudiente_id: acudienteData.id,
+                ...vaAcudientePayload,
+              })
+          ).then(({ error }) => {
+            if (error) console.error(`[csvUpload] valiente_acudiente ${valienteId}:`, error.message);
+          });
+        })
+      );
+    }
+
+    // Esperar todas las inserciones relacionadas (fallos parciales son aceptables)
+    await Promise.all(relacionadas);
+
+    report.insertedCount++;
+    processed++;
     onProgress?.(processed, rows.length);
   }
 

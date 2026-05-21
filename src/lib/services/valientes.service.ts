@@ -38,8 +38,8 @@ export async function getValienteById(id: number) {
     .select(`
       *,
       ubicacion:valiente_ubicacion(*),
-      salud:valiente_salud(*),
-      educacion:valiente_educacion(*),
+      salud:valiente_salud(*, eps:eps(nombre), ips:ips(nombre)),
+      educacion:valiente_educacion(*, institucion_educativa:institucion_educativa(nombre)),
       ocupacion:valiente_ocupacion(*),
       contexto_familiar:valiente_contexto_familiar(*),
       acudientes:valiente_acudiente(
@@ -335,11 +335,9 @@ export async function registrarValienteCompleto(
     grado_actual: datos.grade || null,
     jornada: null,
     institucion_id: datos.schoolId ?? null,
-    nombre_institucion: datos.schoolName || null,
-    programa_academico: null,
     materia_favorita: datos.favSubject || null,
     materia_dificil: datos.hardSubject || null,
-    esta_estudiando: ['Estudio', 'Estudio y trabajo'].includes(datos.occupation),
+    actividades_extracurriculares: null,
   };
   await supabase.from('valiente_educacion').upsert(educacion);
 
