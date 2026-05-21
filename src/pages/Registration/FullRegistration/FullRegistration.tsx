@@ -6,8 +6,8 @@ import {
 import '../ExpressRegistration/ExpressRegistration.css';
 import './FullRegistration.css';
 import { registrarValienteCompleto, subirDocumentoValiente } from '../../../lib/services/valientes.service';
-import { getEPS, getCiudades, getComunas, getInstitucionesEducativas, getPaises } from '../../../lib/services/catalogos.service';
-import type { EPS, Ciudad, Comuna, InstitucionEducativa, Pais } from '../../../types/database.types';
+import { getEPS, getCiudades, getComunas, getInstitucionesEducativas, getPaises, getIPS } from '../../../lib/services/catalogos.service';
+import type { EPS, Ciudad, Comuna, InstitucionEducativa, Pais, IPS } from '../../../types/database.types';
 
 interface FullRegistrationProps {
   context: 'TRIBU' | 'SOROCA';
@@ -24,6 +24,7 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [epsList, setEpsList] = useState<EPS[]>([]);
+  const [ipsList, setIpsList] = useState<IPS[]>([]);
   const [ciudadesList, setCiudadesList] = useState<Ciudad[]>([]);
   const [comunasList, setComunasList] = useState<Comuna[]>([]);
   const [institucionesList, setInstitucionesList] = useState<InstitucionEducativa[]>([]);
@@ -35,29 +36,31 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
       getCiudades(),
       getPaises(),
       getInstitucionesEducativas(),
-    ]).then(([eps, ciudades, paises, instituciones]) => {
+      getIPS(),
+    ]).then(([eps, ciudades, paises, instituciones, ips]) => {
       setEpsList(eps);
       setCiudadesList(ciudades);
       setPaisesList(paises);
       setInstitucionesList(instituciones);
+      setIpsList(ips);
     }).catch(console.error);
   }, []);
   const [formData, setFormData] = useState({
     program: context, discipline: 'Ultimate',
     docType: 'TI', docId: '',
-    firstName: '', lastName: '',
+    firstName: '', lastName: '', apodo: '',
     sex: '', genderIdentity: '',
     birthDate: '', birthPlaceCityId: null as number | null, birthPlaceOther: '', birthPlaceCityName: '',
-    nationality: 'Colombiana', paisId: null as number | null,
+    nationality: 'Colombiana', paisId: null as number | null, nationalityOther: '',
     phone: '', email: '', linkage: '',
     address: '', neighborhood: '', cityId: null as number | null, communeId: null as number | null,
     stratum: '',
-    occupation: '', educationLevel: '', grade: '', schoolId: null as number | null, schoolName: '',
+    occupation: '', educationLevel: '', grade: '', schoolId: null as number | null, schoolName: '', schoolOther: '',
     favSubject: '', hardSubject: '', responsibilities: '', hobbies: '',
     workPlace: '', workDescription: '',
     // Step 3 — Salud y Bienestar
-    epsId: null as number | null,
-    ips: '', bloodType: '',
+    epsId: null as number | null, epsOther: '',
+    ipsId: null as number | null, ipsOther: '', bloodType: '',
     hasDisability: 'No', disabilityDetails: '',
     hasAllergy: 'No', allergyDetails: '',
     hasMedication: 'No', medicationDetails: '',
@@ -66,10 +69,11 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     isConflictVictim: 'No', isRUV: 'No',
     ethnicity: '', ethnicityOther: '',
     // Step 5 — Acudiente y Deporte
-    guardianDocType: 'Cédula Ciudadanía', guardianDocId: '',
+    guardianDocType: 'CC', guardianDocId: '',
     guardianFullName: '', guardianKinship: '', guardianPhone: '', guardianEmail: '',
     guardianWorks: 'No',
-    shirtSize: '', shoeSize: '',
+    rugbyBackground: 'No',
+    shirtSize: '', pantalonSize: '', shoeSize: '',
     trainingDays: [] as string[],
     docIdentity: null as File | null,
     docEps: null as File | null,
@@ -302,6 +306,10 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 <div><label className="form-label">NOMBRES</label><input name="firstName" value={formData.firstName} onChange={handleChange} required className="form-input" /></div>
                 <div><label className="form-label">APELLIDOS</label><input name="lastName" value={formData.lastName} onChange={handleChange} required className="form-input" /></div>
               </div>
+              <div>
+                <label className="form-label">APODO (OPCIONAL)</label>
+                <input name="apodo" value={formData.apodo} onChange={handleChange} className="form-input" placeholder="¿Cómo le dicen?" />
+              </div>
               <div className="form-grid-2">
                 <div>
                   <label className="form-label">SEXO BIOLÓGICO</label>
@@ -353,12 +361,12 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
               <div className="form-grid-2">
                 <div><label className="form-label">NACIONALIDAD</label>
                   <select
-                    name="paisId"
-                    value={formData.paisId ?? ''}
+                    value={formData.paisId === -1 ? 'otro' : (formData.paisId ?? '')}
                     onChange={e => setFormData(prev => ({
                       ...prev,
-                      paisId: e.target.value ? Number(e.target.value) : null,
-                      nationality: paisesList.find(p => p.id === Number(e.target.value))?.nombre ?? '',
+                      paisId: e.target.value === 'otro' ? -1 : (e.target.value ? Number(e.target.value) : null),
+                      nationality: e.target.value === 'otro' || !e.target.value ? '' : (paisesList.find(p => p.id === Number(e.target.value))?.nombre ?? ''),
+                      nationalityOther: e.target.value !== 'otro' ? '' : prev.nationalityOther,
                     }))}
                     className="form-select"
                   >
@@ -366,7 +374,18 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                     {paisesList.map(p => (
                       <option key={p.id} value={p.id}>{p.nombre}</option>
                     ))}
+                    <option value="otro">Otra / No aparece en la lista</option>
                   </select>
+                  {formData.paisId === -1 && (
+                    <input
+                      name="nationalityOther"
+                      value={formData.nationalityOther}
+                      onChange={handleChange}
+                      className="form-input"
+                      placeholder="Escribe la nacionalidad..."
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="form-label">TIPO DOCUMENTO</label>
@@ -483,11 +502,12 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
               <div className="form-group">
                 <label className="form-label">INSTITUCIÓN</label>
                 <select
-                  value={formData.schoolId ?? ''}
+                  value={formData.schoolId === -1 ? 'otro' : (formData.schoolId ?? '')}
                   onChange={e => setFormData(prev => ({
                     ...prev,
-                    schoolId: e.target.value ? Number(e.target.value) : null,
-                    schoolName: institucionesList.find(i => i.id === Number(e.target.value))?.nombre ?? '',
+                    schoolId: e.target.value === 'otro' ? -1 : (e.target.value ? Number(e.target.value) : null),
+                    schoolName: e.target.value === 'otro' || !e.target.value ? '' : (institucionesList.find(i => i.id === Number(e.target.value))?.nombre ?? ''),
+                    schoolOther: e.target.value !== 'otro' ? '' : prev.schoolOther,
                   }))}
                   className="form-select"
                 >
@@ -495,7 +515,18 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                   {institucionesList.map(i => (
                     <option key={i.id} value={i.id}>{i.nombre}</option>
                   ))}
+                  <option value="otro">Otra / No aparece en la lista</option>
                 </select>
+                {formData.schoolId === -1 && (
+                  <input
+                    name="schoolOther"
+                    value={formData.schoolOther}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="Escribe el nombre de la institución..."
+                    style={{ marginTop: '0.5rem' }}
+                  />
+                )}
               </div>
               <div className="form-grid-2">
                 <div><label className="form-label">MATERIA FAVORITA</label><input name="favSubject" value={formData.favSubject} onChange={handleChange} className="form-input" /></div>
@@ -512,11 +543,11 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 <div>
                   <label className="form-label">EPS / ASEGURADORA</label>
                   <select
-                    name="epsId"
-                    value={formData.epsId ?? ''}
+                    value={formData.epsId === -1 ? 'otro' : (formData.epsId ?? '')}
                     onChange={e => setFormData(prev => ({
                       ...prev,
-                      epsId: e.target.value ? Number(e.target.value) : null,
+                      epsId: e.target.value === 'otro' ? -1 : (e.target.value ? Number(e.target.value) : null),
+                      epsOther: e.target.value !== 'otro' ? '' : prev.epsOther,
                     }))}
                     className="form-select"
                   >
@@ -524,9 +555,47 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                     {epsList.map(eps => (
                       <option key={eps.id} value={eps.id}>{eps.nombre}</option>
                     ))}
+                    <option value="otro">Otra / No aparece en la lista</option>
                   </select>
+                  {formData.epsId === -1 && (
+                    <input
+                      name="epsOther"
+                      value={formData.epsOther}
+                      onChange={handleChange}
+                      className="form-input"
+                      placeholder="Escribe el nombre de la EPS..."
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                  )}
                 </div>
-                <div><label className="form-label">IPS (EMERGENCIAS)</label><input name="ips" value={formData.ips} onChange={handleChange} className="form-input" placeholder="Ej. Clínica Las Américas..." /></div>
+                <div>
+                  <label className="form-label">IPS (EMERGENCIAS)</label>
+                  <select
+                    value={formData.ipsId === -1 ? 'otro' : (formData.ipsId ?? '')}
+                    onChange={e => setFormData(prev => ({
+                      ...prev,
+                      ipsId: e.target.value === 'otro' ? -1 : (e.target.value ? Number(e.target.value) : null),
+                      ipsOther: e.target.value !== 'otro' ? '' : prev.ipsOther,
+                    }))}
+                    className="form-select"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {ipsList.map(ips => (
+                      <option key={ips.id} value={ips.id}>{ips.nombre}</option>
+                    ))}
+                    <option value="otro">Otra / No aparece en la lista</option>
+                  </select>
+                  {formData.ipsId === -1 && (
+                    <input
+                      name="ipsOther"
+                      value={formData.ipsOther}
+                      onChange={handleChange}
+                      className="form-input"
+                      placeholder="Escribe el nombre de la IPS..."
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                  )}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">TIPO DE SANGRE</label>
@@ -622,10 +691,11 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 <div>
                   <label className="form-label">TIPO DE DOCUMENTO</label>
                   <select name="guardianDocType" value={formData.guardianDocType} onChange={handleChange} className="form-select">
-                    <option value="Cédula Ciudadanía">Cédula Ciudadanía</option>
-                    <option value="Cédula Extranjería">Cédula Extranjería</option>
-                    <option value="Pasaporte">Pasaporte</option>
+                    <option value="TI">TI</option>
+                    <option value="CC">CC</option>
+                    <option value="CCE">CCE</option>
                     <option value="PPT">PPT</option>
+                    <option value="PAS">PAS</option>
                   </select>
                 </div>
                 <div><label className="form-label">NÚMERO DE DOCUMENTO</label><input name="guardianDocId" value={formData.guardianDocId} onChange={handleChange} className="form-input" placeholder="Sin puntos..." /></div>
@@ -646,7 +716,14 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
               </div>
 
               <p className="wizard-section-subtitle" style={{ marginTop: '1.25rem' }}>Perfil Deportivo</p>
-              <div className={context === 'TRIBU' ? 'form-grid-2' : 'form-group'}>
+              <div className="form-group">
+                <label className="form-label">¿HA JUGADO ANTES?</label>
+                <select name="rugbyBackground" value={formData.rugbyBackground} onChange={handleChange} className="form-select">
+                  <option value="No">No (Principiante)</option>
+                  <option value="Si">Sí (Experiencia previa)</option>
+                </select>
+              </div>
+              <div className="form-grid-2">
                 <div>
                   <label className="form-label">TALLA DE CAMISETA</label>
                   <select name="shirtSize" value={formData.shirtSize} onChange={handleChange} className="form-select">
@@ -654,16 +731,23 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                     {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                {context === 'TRIBU' && (
-                  <div>
-                    <label className="form-label">TALLA DE GUAYOS</label>
-                    <select name="shoeSize" value={formData.shoeSize} onChange={handleChange} className="form-select">
-                      <option value="">Seleccionar...</option>
-                      {['34','35','36','37','38','39','40','41','42','43','44','45'].map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className="form-label">TALLA DE PANTALÓN</label>
+                  <select name="pantalonSize" value={formData.pantalonSize} onChange={handleChange} className="form-select">
+                    <option value="">Seleccionar...</option>
+                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
+              {context === 'TRIBU' && (
+                <div>
+                  <label className="form-label">TALLA DE GUAYOS</label>
+                  <select name="shoeSize" value={formData.shoeSize} onChange={handleChange} className="form-select">
+                    <option value="">Seleccionar...</option>
+                    {['34','35','36','37','38','39','40','41','42','43','44','45'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">COMPROMISO DE ENTRENOS</label>
                 <div className="wizard-chips">

@@ -37,14 +37,6 @@ export interface Comuna {
   created_at: string;
 }
 
-export interface Barrio {
-  id: number;
-  ciudad_id: number;
-  comuna_id: number;
-  nombre: string;
-  created_at: string;
-}
-
 export interface InstitucionEducativa {
   id: number;
   nombre: string;
@@ -137,14 +129,16 @@ export interface Valiente {
   
   // Contacto
   celular: string | null;
-  telefono_fijo: string | null;
   email: string | null;
-  redes_sociales: Json | null;
   
   // Ubicación de Nacimiento
   lugar_nacimiento: string | null;
   lugar_nacimiento_ciudad_id: number | null;
   nacionalidad: string | null;
+  
+  // Ocupación (directo en valiente)
+  trabaja_estudia: string | null;
+  hobbies: string | null;
   
   // Estado
   estado: string;
@@ -167,13 +161,7 @@ export interface Acudiente {
   numero_documento: string | null;
   nombre_completo: string;
   celular: string | null;
-  telefono_fijo: string | null;
   email: string | null;
-  sexo: string | null;
-  edad: number | null;
-  ocupacion: string | null;
-  tipo_empleo: string | null;
-  grupo_vulnerabilidad: string | null;
   tiene_autorizacion_firmada: boolean;
   created_at: string;
   updated_at: string;
@@ -199,7 +187,6 @@ export interface ValienteUbicacion {
   direccion: string | null;
   ciudad_id: number | null;
   comuna_id: number | null;
-  barrio_id: number | null;
   estrato: string | null;
   latitud: number | null;
   longitud: number | null;
@@ -230,27 +217,12 @@ export interface ValienteEducacion {
   valiente_id: number;
   nivel_educativo: string | null;
   grado_actual: string | null;
-  jornada: string | null;
   institucion_id: number | null;
   materia_favorita: string | null;
   materia_dificil: string | null;
-  actividades_extracurriculares: string | null;
   updated_at: string;
 }
 
-export interface ValienteOcupacion {
-  valiente_id: number;
-  esta_trabajando: boolean;
-  lugar_trabajo: string | null;
-  cargo: string | null;
-  tipo_empleo: string | null;
-  horario_trabajo: string | null;
-  otras_responsabilidades: string | null;
-  actividades_extracurriculares: string | null;
-  hobbies: string | null;
-  intereses_profesionales: string | null;
-  updated_at: string;
-}
 
 export interface ValienteContextoFamiliar {
   valiente_id: number;
@@ -308,7 +280,6 @@ export interface ValientePerfilDeportivo {
   talla_camisa: string | null;
   talla_pantalon: string | null;
   horario_entrenamiento: Json | null;
-  disponibilidad: string | null;
   updated_at: string;
 }
 
@@ -362,7 +333,6 @@ export interface ValienteCompleto extends Valiente {
   ubicacion?: ValienteUbicacion;
   salud?: ValienteSalud;
   educacion?: ValienteEducacion;
-  ocupacion?: ValienteOcupacion;
   contexto_familiar?: ValienteContextoFamiliar;
   acudientes?: (ValienteAcudiente & { acudiente: Acudiente })[];
   programas?: (ValientePrograma & { programa: Programa })[];

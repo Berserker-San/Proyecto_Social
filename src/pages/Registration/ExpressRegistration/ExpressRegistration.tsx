@@ -17,12 +17,12 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
   const [formData, setFormData] = useState({
     discipline: 'ULTIMATE',
     docType: 'TI', docId: '',
-    firstName: '', lastName: '',
+    firstName: '', lastName: '', apodo: '',
     sex: '', genderIdentity: '',
     birthDate: '', linkage: '', phone: '',
     guardianName: '', guardianKinship: '', guardianPhone: '',
     hasMedicalCondition: 'No', medicalDetails: '', medications: '',
-    rugbyBackground: 'No', shirtSize: '', shoeSize: '',
+    rugbyBackground: 'No', shirtSize: '', pantalonSize: '', shoeSize: '',
     motivation: '', terms: false,
   });
 
@@ -46,14 +46,12 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         numero_documento: formData.docId,
         nombres: formData.firstName,
         apellidos: formData.lastName,
-        apodo: null,
+        apodo: formData.apodo || null,
         sexo: formData.sex,
         identidad_genero: formData.genderIdentity || null,
         fecha_nacimiento: formData.birthDate,
         celular: formData.phone,
-        telefono_fijo: null,
         email: null,
-        redes_sociales: null,
         lugar_nacimiento: null,
         lugar_nacimiento_ciudad_id: null,
         nacionalidad: 'Colombiana',
@@ -69,13 +67,7 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         numero_documento: null,
         nombre_completo: formData.guardianName,
         celular: formData.guardianPhone,
-        telefono_fijo: null,
         email: null,
-        sexo: null,
-        edad: null,
-        ocupacion: null,
-        tipo_empleo: null,
-        grupo_vulnerabilidad: null,
         tiene_autorizacion_firmada: false,
       });
 
@@ -114,9 +106,8 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
           experiencia_previa: formData.rugbyBackground === 'Si' ? 'Experiencia previa' : null,
           talla_guayos: formData.shoeSize || null,
           talla_camisa: formData.shirtSize || null,
-          talla_pantalon: null,
+          talla_pantalon: formData.pantalonSize || null,
           horario_entrenamiento: null,
-          disponibilidad: null,
         });
       }
 
@@ -128,12 +119,12 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         setFormData({
           discipline: 'ULTIMATE',
           docType: 'TI', docId: '',
-          firstName: '', lastName: '',
+          firstName: '', lastName: '', apodo: '',
           sex: '', genderIdentity: '',
           birthDate: '', linkage: '', phone: '',
           guardianName: '', guardianKinship: '', guardianPhone: '',
           hasMedicalCondition: 'No', medicalDetails: '', medications: '',
-          rugbyBackground: 'No', shirtSize: '', shoeSize: '',
+          rugbyBackground: 'No', shirtSize: '', pantalonSize: '', shoeSize: '',
           motivation: '', terms: false,
         });
         setSuccessMsg(null);
@@ -243,6 +234,10 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
                 <input name="lastName" value={formData.lastName} onChange={handleChange} required className="form-input" placeholder="Ej. Pérez" />
               </div>
             </div>
+            <div className="form-group">
+              <label className="form-label">Apodo (Opcional)</label>
+              <input name="apodo" value={formData.apodo} onChange={handleChange} className="form-input" placeholder="¿Cómo le dicen?" />
+            </div>
             <div className="form-grid-2">
               <div>
                 <label className="form-label">Sexo Biológico</label>
@@ -319,12 +314,25 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
             <div className="form-grid-2">
               <div>
                 <label className="form-label">Talla Camiseta</label>
-                <input name="shirtSize" value={formData.shirtSize} onChange={handleChange} className="form-input" placeholder="S, M, L..." />
+                <select name="shirtSize" value={formData.shirtSize} onChange={handleChange} className="form-select">
+                  <option value="">Seleccionar...</option>
+                  {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div>
-                <label className="form-label">Talla Guayos (EU)</label>
-                <input name="shoeSize" value={formData.shoeSize} onChange={handleChange} className="form-input" placeholder="38, 40..." />
-              </div>
+                  <label className="form-label">Talla Pantalón</label>
+                  <select name="pantalonSize" value={formData.pantalonSize} onChange={handleChange} className="form-select">
+                    <option value="">Seleccionar...</option>
+                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Talla Guayos (EU)</label>
+              <select name="shoeSize" value={formData.shoeSize} onChange={handleChange} className="form-select">
+                <option value="">Seleccionar...</option>
+                {['34','35','36','37','38','39','40','41','42','43','44','45'].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">¿Por qué quieres ser parte?</label>

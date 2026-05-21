@@ -5,7 +5,6 @@ import type {
   ValienteSalud,
   ValienteUbicacion,
   ValienteEducacion,
-  ValienteOcupacion,
   ValienteContextoFamiliar,
   ValientePerfilDeportivo,
   ValientePrograma,
@@ -40,7 +39,6 @@ export async function getValienteById(id: number) {
       ubicacion:valiente_ubicacion(*),
       salud:valiente_salud(*, eps:eps(nombre), ips:ips(nombre)),
       educacion:valiente_educacion(*, institucion_educativa:institucion_educativa(nombre)),
-      ocupacion:valiente_ocupacion(*),
       contexto_familiar:valiente_contexto_familiar(*),
       acudientes:valiente_acudiente(
         *,
@@ -183,6 +181,7 @@ export interface DatosRegistroCompleto {
   docId: string;
   firstName: string;
   lastName: string;
+  apodo: string;
   sex: string;
   genderIdentity: string;
   birthDate: string;
@@ -191,6 +190,7 @@ export interface DatosRegistroCompleto {
   birthPlaceCityName: string;
   nationality: string;
   paisId: number | null;
+  nationalityOther: string;
   phone: string;
   email: string;
   linkage: string;
@@ -206,6 +206,7 @@ export interface DatosRegistroCompleto {
   grade: string;
   schoolId: number | null;
   schoolName: string;
+  schoolOther: string;
   favSubject: string;
   hardSubject: string;
   responsibilities: string;
@@ -214,7 +215,9 @@ export interface DatosRegistroCompleto {
   workDescription: string;
   // Salud
   epsId: number | null;
-  ips: string;
+  epsOther: string;
+  ipsId: number | null;
+  ipsOther: string;
   bloodType: string;
   hasDisability: string;
   disabilityDetails: string;
@@ -240,7 +243,9 @@ export interface DatosRegistroCompleto {
   guardianWorks: string;
   // Deportivo
   shirtSize: string;
+  pantalonSize: string;
   shoeSize: string;
+  rugbyBackground: string;
   trainingDays: string[];
 }
 
@@ -264,19 +269,19 @@ export async function registrarValienteCompleto(
     numero_documento: datos.docId,
     nombres: datos.firstName,
     apellidos: datos.lastName,
-    apodo: null,
+    apodo: datos.apodo || null,
     fecha_nacimiento: datos.birthDate,
     sexo: datos.sex || null,
     identidad_genero: datos.genderIdentity || null,
     celular: datos.phone || null,
-    telefono_fijo: null,
     email: datos.email || null,
-    redes_sociales: null,
     lugar_nacimiento: datos.birthPlaceCityId === -1
       ? (datos.birthPlaceOther || null)
       : (datos.birthPlaceCityName || null),
     lugar_nacimiento_ciudad_id: datos.birthPlaceCityId !== null && datos.birthPlaceCityId !== -1 ? datos.birthPlaceCityId : null,
-    nacionalidad: datos.nationality || null,
+    nacionalidad: datos.paisId === -1 ? (datos.nationalityOther || null) : (datos.nationality || null),
+    trabaja_estudia: datos.occupation || null,
+    hobbies: datos.hobbies || null,
     estado: 'ACTIVO',
     foto_url: null,
     created_by: null,
@@ -301,7 +306,6 @@ export async function registrarValienteCompleto(
     direccion: datos.address || null,
     ciudad_id: datos.cityId ?? null,
     comuna_id: datos.communeId ?? null,
-    barrio_id: null,
     estrato: datos.stratum || null,
     latitud: null,
     longitud: null,
@@ -311,9 +315,10 @@ export async function registrarValienteCompleto(
   // ── 4. Salud ──────────────────────────────────────────
   const salud: Omit<ValienteSalud, 'updated_at'> = {
     valiente_id: valienteId,
-    eps_id: datos.epsId ?? null,
-    ips_id: null,
-    ips_nombre: datos.ips || null,
+    eps_id: datos.epsId !== null && datos.epsId !== -1 ? datos.epsId : null,
+    ips_id: datos.ipsId !== null && datos.ipsId !== -1 ? datos.ipsId : null,
+    ips_nombre: datos.ipsId === -1 ? (datos.ipsOther || null) : null,
+    eps_nombre: datos.epsId === -1 ? (datos.epsOther || null) : null,
     tipo_sangre: datos.bloodType || null,
     tiene_discapacidad: datos.hasDisability === 'Si',
     tipo_discapacidad: datos.hasDisability === 'Si' ? datos.disabilityDetails || null : null,
@@ -333,30 +338,13 @@ export async function registrarValienteCompleto(
     valiente_id: valienteId,
     nivel_educativo: datos.educationLevel || null,
     grado_actual: datos.grade || null,
-    jornada: null,
-    institucion_id: datos.schoolId ?? null,
+    institucion_id: datos.schoolId !== null && datos.schoolId !== -1 ? datos.schoolId : null,
     materia_favorita: datos.favSubject || null,
     materia_dificil: datos.hardSubject || null,
-    actividades_extracurriculares: null,
   };
   await supabase.from('valiente_educacion').upsert(educacion);
 
-  // ── 6. Ocupación ──────────────────────────────────────
-  const ocupacion: Omit<ValienteOcupacion, 'updated_at'> = {
-    valiente_id: valienteId,
-    esta_trabajando: ['Trabajo', 'Estudio y trabajo'].includes(datos.occupation),
-    lugar_trabajo: datos.workPlace || null,
-    cargo: null,
-    tipo_empleo: null,
-    horario_trabajo: null,
-    otras_responsabilidades: datos.responsibilities || null,
-    actividades_extracurriculares: null,
-    hobbies: datos.hobbies || null,
-    intereses_profesionales: null,
-  };
-  await supabase.from('valiente_ocupacion').upsert(ocupacion);
-
-  // ── 7. Contexto familiar ──────────────────────────────
+  // ── 6. Contexto familiar ──────────────────────────────
   const contexto: Omit<ValienteContextoFamiliar, 'updated_at'> = {
     valiente_id: valienteId,
     composicion_familiar: datos.familyComposition || null,
@@ -378,13 +366,12 @@ export async function registrarValienteCompleto(
   const perfilDeportivo: Omit<ValientePerfilDeportivo, 'updated_at'> = {
     valiente_id: valienteId,
     disciplina: datos.discipline || null,
-    tiene_experiencia_previa: false,
-    experiencia_previa: null,
+    tiene_experiencia_previa: datos.rugbyBackground === 'Si',
+    experiencia_previa: datos.rugbyBackground === 'Si' ? 'Experiencia previa' : null,
     talla_guayos: datos.shoeSize || null,
     talla_camisa: datos.shirtSize || null,
-    talla_pantalon: null,
+    talla_pantalon: datos.pantalonSize || null,
     horario_entrenamiento: datos.trainingDays.length > 0 ? datos.trainingDays : null,
-    disponibilidad: null,
   };
   await supabase.from('valiente_perfil_deportivo').upsert(perfilDeportivo);
 
@@ -426,67 +413,80 @@ export async function registrarValienteCompleto(
 
   // ── 10. Acudiente ─────────────────────────────────────
   if (datos.guardianFullName) {
-    // Buscar acudiente existente por documento
     let acudienteId: number | null = null;
 
-    if (datos.guardianDocId) {
-      const { data: acudienteExistente } = await supabase
-        .from('acudiente')
-        .select('id')
-        .eq('tipo_documento', datos.guardianDocType)
-        .eq('numero_documento', datos.guardianDocId)
-        .maybeSingle();
-
-      if (acudienteExistente) {
-        acudienteId = acudienteExistente.id;
-        // Actualizar datos del acudiente
-        await supabase
-          .from('acudiente')
-          .update({
-            nombre_completo: datos.guardianFullName,
-            celular: datos.guardianPhone || null,
-            email: datos.guardianEmail || null,
-            esta_trabajando: datos.guardianWorks === 'Si',
-          } as any)
-          .eq('id', acudienteId);
-      }
-    }
-
-    if (!acudienteId) {
-      // Crear nuevo acudiente
-      const nuevoAcudiente: Omit<Acudiente, 'id' | 'created_at' | 'updated_at'> = {
-        tipo_documento: datos.guardianDocType || null,
-        numero_documento: datos.guardianDocId || null,
-        nombre_completo: datos.guardianFullName,
-        celular: datos.guardianPhone || null,
-        telefono_fijo: null,
-        email: datos.guardianEmail || null,
-        sexo: null,
-        edad: null,
-        ocupacion: null,
-        tipo_empleo: null,
-        grupo_vulnerabilidad: null,
-        tiene_autorizacion_firmada: false,
-      };
-      const { data: acudienteCreado, error: errAcudiente } = await supabase
-        .from('acudiente')
-        .insert(nuevoAcudiente)
-        .select('id')
-        .single();
-
-      if (errAcudiente) throw errAcudiente;
-      acudienteId = acudienteCreado.id;
-    }
-
-    // Vincular acudiente al valiente si no está ya vinculado
-    const { data: vinculoExistente } = await supabase
+    // Paso 1: buscar si el valiente ya tiene un acudiente principal vinculado
+    const { data: vinculoPrincipal } = await supabase
       .from('valiente_acudiente')
-      .select('id')
+      .select('id, acudiente_id')
       .eq('valiente_id', valienteId)
-      .eq('acudiente_id', acudienteId)
+      .eq('es_principal', true)
       .maybeSingle();
 
-    if (!vinculoExistente) {
+    if (vinculoPrincipal) {
+      // Ya existe vínculo → actualizar el acudiente existente
+      acudienteId = vinculoPrincipal.acudiente_id;
+      await supabase
+        .from('acudiente')
+        .update({
+          tipo_documento: datos.guardianDocType || null,
+          numero_documento: datos.guardianDocId || null,
+          nombre_completo: datos.guardianFullName,
+          celular: datos.guardianPhone || null,
+          email: datos.guardianEmail || null,
+        })
+        .eq('id', acudienteId);
+
+      // Actualizar parentesco en el vínculo
+      await supabase
+        .from('valiente_acudiente')
+        .update({ parentesco: datos.guardianKinship || 'OTRO' })
+        .eq('id', vinculoPrincipal.id);
+
+    } else {
+      // No existe vínculo → buscar acudiente por documento o crear uno nuevo
+      if (datos.guardianDocId) {
+        const { data: acudientePorDoc } = await supabase
+          .from('acudiente')
+          .select('id')
+          .eq('tipo_documento', datos.guardianDocType)
+          .eq('numero_documento', datos.guardianDocId)
+          .maybeSingle();
+
+        if (acudientePorDoc) {
+          acudienteId = acudientePorDoc.id;
+          await supabase
+            .from('acudiente')
+            .update({
+              nombre_completo: datos.guardianFullName,
+              celular: datos.guardianPhone || null,
+              email: datos.guardianEmail || null,
+            })
+            .eq('id', acudienteId);
+        }
+      }
+
+      if (!acudienteId) {
+        // Crear nuevo acudiente
+        const nuevoAcudiente: Omit<Acudiente, 'id' | 'created_at' | 'updated_at'> = {
+          tipo_documento: datos.guardianDocType || null,
+          numero_documento: datos.guardianDocId || null,
+          nombre_completo: datos.guardianFullName,
+          celular: datos.guardianPhone || null,
+          email: datos.guardianEmail || null,
+          tiene_autorizacion_firmada: false,
+        };
+        const { data: acudienteCreado, error: errAcudiente } = await supabase
+          .from('acudiente')
+          .insert(nuevoAcudiente)
+          .select('id')
+          .single();
+
+        if (errAcudiente) throw errAcudiente;
+        acudienteId = acudienteCreado.id;
+      }
+
+      // Crear el vínculo
       await supabase.from('valiente_acudiente').insert({
         valiente_id: valienteId,
         acudiente_id: acudienteId,
