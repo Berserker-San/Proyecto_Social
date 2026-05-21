@@ -65,7 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
     }
     if (activeView === 'csv-upload') return <CSVUploader onBack={() => setActiveView('welcome')} />;
     if (activeView === 'estadisticas') return <Statistics context={appContext} />;
-    if (activeView === 'attendance')   return <Attendance usuarioId={usuarioId} />;
+    if (activeView === 'attendance')   return <Attendance usuarioId={usuarioId} context={appContext} />;
     if (activeView === 'directorio') {
       return (
         <ValientesListView

@@ -4,10 +4,12 @@ import {
   XCircle, Clock, Search, Loader2, Trash2, Calendar,
 } from 'lucide-react';
 import { getEventos, crearEvento, eliminarEvento, getAsistenciaEvento, upsertAsistencia } from '../../lib/services/attendance.service';
+import { supabase } from '../../lib/supabase';
 import type { Evento, Valiente } from '../../types/database.types';
 import './Attendance.css';
 
 type View = 'list' | 'take';
+type DateFilter = 'all' | 'past' | 'today' | 'upcoming';
 
 type ValienteConAsistencia = Valiente & {
   asistencia_estado: string | null;
@@ -23,7 +25,10 @@ const estadoConfig: Record<EstadoAsistencia, { label: string; icon: React.ReactN
   Justificado: { label: 'Justificado', icon: <Clock size={15} />,        cls: 'att-chip--justified' },
 };
 
-const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null }) => {
+const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TRIBU' | 'SOROCA' }> = ({
+  usuarioId = null,
+  context = 'GLOBAL',
+}) => {
   const [view,          setView]          = useState<View>('list');
   const [eventos,       setEventos]       = useState<Evento[]>([]);
   const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
@@ -33,7 +38,15 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
   const [loadingTake,   setLoadingTake]   = useState(false);
   const [saving,        setSaving]        = useState<number | null>(null);
   const [showForm,      setShowForm]      = useState(false);
-  const [formData,      setFormData]      = useState({ nombre_evento: '', fecha: '', hora: '' });
+  const [dateFilter,    setDateFilter]    = useState<DateFilter>('today');
+  const [searchDate,    setSearchDate]    = useState('');
+  const [programas,     setProgramas]     = useState<{ id: number; codigo: string; nombre: string }[]>([]);
+  const [formData,      setFormData]      = useState({
+    nombre_evento: '',
+    fecha: '',
+    hora: '',
+    programa_id: '',   // id como string para el select
+  });
   const [formError,     setFormError]     = useState<string | null>(null);
   const [submitting,    setSubmitting]    = useState(false);
 
@@ -51,13 +64,30 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
 
   useEffect(() => { loadEventos(); }, [loadEventos]);
 
+  // Carga programas disponibles
+  useEffect(() => {
+    Promise.resolve(
+      supabase.from('programa').select('id, codigo, nombre').eq('esta_activo', true)
+    ).then(({ data }) => setProgramas(data ?? [])).catch(console.error);
+  }, []);
+
+  // Sincroniza programa_id cuando cambia el contexto
+  useEffect(() => {
+    if (context === 'GLOBAL') {
+      setFormData(prev => ({ ...prev, programa_id: '' }));
+    } else {
+      const match = programas.find(p => p.codigo === context);
+      setFormData(prev => ({ ...prev, programa_id: match ? String(match.id) : '' }));
+    }
+  }, [context, programas]);
+
   // ── Abrir toma de asistencia ───────────────────────────────────────────
   const openEvento = async (evento: Evento) => {
     setSelectedEvento(evento);
     setView('take');
     setLoadingTake(true);
     try {
-      setValientes(await getAsistenciaEvento(evento.id));
+      setValientes(await getAsistenciaEvento(evento.id, evento.programa_id));
     } catch (e) {
       console.error(e);
     } finally {
@@ -95,9 +125,10 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
         nombre_evento: formData.nombre_evento,
         fecha:         formData.fecha,
         hora:          formData.hora || null,
+        programa_id:   formData.programa_id ? Number(formData.programa_id) : null,
         creado_por:    usuarioId,
       });
-      setFormData({ nombre_evento: '', fecha: '', hora: '' });
+      setFormData({ nombre_evento: '', fecha: '', hora: '', programa_id: context !== 'GLOBAL' ? String(programas.find(p => p.codigo === context)?.id ?? '') : '' });
       setShowForm(false);
       await loadEventos();
     } catch (err: any) {
@@ -126,6 +157,33 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
       .includes(search.toLowerCase())
   );
 
+  // ── Filtro eventos por contexto ───────────────────────────────────────
+  // Fecha local colombiana (UTC-5) en formato YYYY-MM-DD
+  const now = new Date();
+  const bogotaOffset = -5 * 60; // UTC-5 en minutos
+  const localMs = now.getTime() + (bogotaOffset - (-now.getTimezoneOffset())) * 60000;
+  const bogotaDate = new Date(localMs);
+  const todayCol = bogotaDate.toISOString().slice(0, 10);
+
+  const eventosFiltrados = eventos
+    .filter(ev => {
+      // Filtro por contexto/programa
+      if (context !== 'GLOBAL') {
+        if (ev.programa_id) {
+          const prog = programas.find(p => p.id === ev.programa_id);
+          if (prog?.codigo !== context) return false;
+        }
+      }
+      // Si hay búsqueda por fecha exacta, tiene prioridad
+      if (searchDate) return ev.fecha === searchDate;
+      // Filtro por botón
+      if (dateFilter === 'all')      return true;
+      if (dateFilter === 'today')    return ev.fecha === todayCol;
+      if (dateFilter === 'past')     return ev.fecha < todayCol;
+      if (dateFilter === 'upcoming') return ev.fecha > todayCol;
+      return true;
+    });
+
   const presentCount    = valientes.filter(v => v.asistencia_estado === 'Presente').length;
   const ausenteCount    = valientes.filter(v => v.asistencia_estado === 'Ausente').length;
   const justCount       = valientes.filter(v => v.asistencia_estado === 'Justificado').length;
@@ -150,6 +208,37 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
           </button>
         </div>
 
+        {/* Filtros de fecha */}
+        <div className="att-filters-row">
+          <div className="att-date-filters">
+            {([
+              { key: 'all',      label: 'Todos'      },
+              { key: 'past',     label: 'Anteriores' },
+              { key: 'today',    label: 'Hoy'        },
+              { key: 'upcoming', label: 'Próximos'   },
+            ] as { key: DateFilter; label: string }[]).map(f => (
+              <button
+                key={f.key}
+                className={`att-date-filter-btn${dateFilter === f.key && !searchDate ? ' att-date-filter-btn--active' : ''}`}
+                onClick={() => { setDateFilter(f.key); setSearchDate(''); }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="att-date-search">
+            <input
+              type="date"
+              className={`att-input att-date-input${searchDate ? ' att-date-input--active' : ''}`}
+              value={searchDate}
+              onChange={e => setSearchDate(e.target.value)}
+            />
+            {searchDate && (
+              <button className="att-date-clear" onClick={() => setSearchDate('')}>✕</button>
+            )}
+          </div>
+        </div>
+
         {/* Formulario nuevo evento */}
         {showForm && (
           <div className="att-form-card">
@@ -164,6 +253,19 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
                     value={formData.nombre_evento}
                     onChange={e => setFormData(p => ({ ...p, nombre_evento: e.target.value }))}
                   />
+                </div>
+                <div className="att-form-group">
+                  <label className="att-label">PROGRAMA</label>
+                  <select
+                    className="att-input"
+                    value={formData.programa_id}
+                    onChange={e => setFormData(p => ({ ...p, programa_id: e.target.value }))}
+                  >
+                    <option value="">Sin programa</option>
+                    {programas.map(p => (
+                      <option key={p.id} value={String(p.id)}>{p.nombre}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="att-form-group">
                   <label className="att-label">FECHA</label>
@@ -204,14 +306,14 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
             <Loader2 size={28} className="att-spin" />
             <span>Cargando eventos…</span>
           </div>
-        ) : eventos.length === 0 ? (
+        ) : eventosFiltrados.length === 0 ? (
           <div className="att-empty">
             <Calendar size={40} />
             <p>No hay eventos aún. Crea el primero.</p>
           </div>
         ) : (
           <div className="att-event-list">
-            {eventos.map(ev => (
+            {eventosFiltrados.map(ev => (
               <div key={ev.id} className="att-event-card" onClick={() => openEvento(ev)}>
                 <div className="att-event-date">
                   <span className="att-event-day">
@@ -227,6 +329,13 @@ const Attendance: React.FC<{ usuarioId?: string | null }> = ({ usuarioId = null 
                   <span className="att-event-name">{ev.nombre_evento}</span>
                   <span className="att-event-meta">
                     {new Date(ev.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    {ev.programa_id && (
+                      <span className={`att-programa-badge att-programa-badge--${
+                        programas.find(p => p.id === ev.programa_id)?.codigo?.toLowerCase() ?? 'default'
+                      }`}>
+                        {programas.find(p => p.id === ev.programa_id)?.codigo ?? ev.programa_id}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="att-event-actions">

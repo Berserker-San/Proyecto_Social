@@ -15,7 +15,7 @@ export async function getEventos(): Promise<Evento[]> {
 }
 
 export async function crearEvento(
-  payload: Pick<Evento, 'nombre_evento' | 'fecha' | 'hora' | 'creado_por'>
+  payload: Pick<Evento, 'nombre_evento' | 'fecha' | 'hora' | 'creado_por' | 'programa_id'>
 ): Promise<Evento> {
   const { data, error } = await supabase
     .from('evento')
@@ -34,16 +34,42 @@ export async function eliminarEvento(id: number): Promise<void> {
 
 // ── Asistencia ────────────────────────────────────────────────────────────
 
-/** Devuelve todos los valientes activos con su estado de asistencia para un evento */
 export async function getAsistenciaEvento(
-  eventoId: number
+  eventoId: number,
+  programaId?: number | null
 ): Promise<(Valiente & { asistencia_estado: string | null; asistencia_id: number | null })[]> {
+
+  let valienteIds: number[] | null = null;
+
+  console.log(programaId);
+  // Paso 1: si hay programa, obtener los valiente_id del programa con estado ACTIVO
+  if (programaId) {
+    const { data: vpData, error: vpErr } = await supabase
+      .from('valiente_programa')
+      .select('valiente_id')
+      .eq('programa_id', programaId)
+      .eq('estado', 'ACTIVO');
+
+    if (vpErr) throw vpErr;
+
+    valienteIds = (vpData ?? []).map((r: any) => r.valiente_id);
+    if (valienteIds.length === 0) return [];
+  }
+
+  // Paso 2: traer valientes (filtrados o todos)
+  let valientesQuery = supabase
+    .from('valiente')
+    .select('id, nombres, apellidos, numero_documento, tipo_documento, foto_url')
+    .eq('estado', 'ACTIVO')
+    .order('apellidos');
+
+  if (valienteIds) {
+    valientesQuery = valientesQuery.in('id', valienteIds) as typeof valientesQuery;
+  }
+
+  // Paso 3: traer asistencias existentes del evento en paralelo
   const [{ data: valientes, error: vErr }, { data: asistencias, error: aErr }] = await Promise.all([
-    supabase
-      .from('valiente')
-      .select('id, nombres, apellidos, numero_documento, tipo_documento, foto_url')
-      .eq('estado', 'ACTIVO')
-      .order('apellidos'),
+    valientesQuery,
     supabase
       .from('asistencia')
       .select('id, valiente_id, estado')

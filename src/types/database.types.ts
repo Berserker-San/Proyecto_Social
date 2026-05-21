@@ -455,6 +455,8 @@ export interface Evento {
   id: number;
   nombre_evento: string;
   creado_por: string | null;   // uuid → usuario_sistema.id
+  programa_id: number | null;  // FK → programa.id
+  programa: string | null;     // 'TRIBU' | 'SOROCA' | null (campo extra para display)
   fecha: string;               // date
   hora: string | null;         // time
   created_at?: string;
