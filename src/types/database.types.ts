@@ -232,11 +232,9 @@ export interface ValienteEducacion {
   grado_actual: string | null;
   jornada: string | null;
   institucion_id: number | null;
-  nombre_institucion: string | null;
-  programa_academico: string | null;
   materia_favorita: string | null;
   materia_dificil: string | null;
-  esta_estudiando: boolean;
+  actividades_extracurriculares: string | null;
   updated_at: string;
 }
 

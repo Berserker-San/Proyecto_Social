@@ -443,7 +443,7 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
           {/* TAB: SALUD */}
           {activeTab === 'health' && (
             <Section title="Salud">
-              <GridItem label="EPS" value={valiente.salud?.eps_id ? `EPS #${valiente.salud.eps_id}` : null} />
+              <GridItem label="EPS" value={(valiente.salud as any)?.eps?.nombre ?? (valiente.salud?.eps_id ? `EPS #${valiente.salud.eps_id}` : null)} />
               <GridItem label="Tipo de Sangre" value={valiente.salud?.tipo_sangre} />
               <GridItem
                 label="Alergias"
@@ -468,14 +468,11 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
             <div className="space-y-6">
               <Section title="Escolaridad">
                 <GridItem label="Nivel" value={valiente.educacion?.nivel_educativo} />
-                <GridItem label="Institución" value={valiente.educacion?.nombre_institucion} />
-                <GridItem label="Programa/Curso" value={valiente.educacion?.programa_academico} />
+                <GridItem label="Institución" value={(valiente.educacion as any)?.institucion_educativa?.nombre ?? null} />
                 <GridItem label="Grado Actual" value={valiente.educacion?.grado_actual} />
-                <GridItem label="Jornada" value={valiente.educacion?.jornada} />
-                <GridItem
-                  label="¿Está Estudiando?"
-                  value={valiente.educacion?.esta_estudiando ? 'Sí' : 'No'}
-                />
+                <GridItem label="Materia Favorita" value={valiente.educacion?.materia_favorita} />
+                <GridItem label="Materia Difícil" value={valiente.educacion?.materia_dificil} />
+                <GridItem label="Actividades / Clubes" value={valiente.educacion?.actividades_extracurriculares} full />
               </Section>
               <Section title="Ocupación">
                 <GridItem
@@ -485,8 +482,6 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 {valiente.ocupacion?.esta_trabajando && (
                   <GridItem label="Lugar de Trabajo" value={valiente.ocupacion?.lugar_trabajo} full />
                 )}
-                <GridItem label="Cargo" value={valiente.ocupacion?.cargo} />
-                <GridItem label="Tipo de Empleo" value={valiente.ocupacion?.tipo_empleo} />
               </Section>
             </div>
           )}
