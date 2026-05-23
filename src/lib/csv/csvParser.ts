@@ -1,7 +1,7 @@
 // =========================================================
-// CSV PARSER — mapea columnas del CSV al modelo Valiente
-// Parseo por índice de columna (no por nombre de encabezado)
-// Cubre todas las tablas relacionadas del valiente
+// CSV PARSER - mapea columnas del CSV al modelo Valiente
+// Parseo por nombre de encabezado, no por indice de columna
+// Permite agregar, quitar o reordenar columnas sin romper el mapeo
 // =========================================================
 
 import type {
@@ -9,7 +9,6 @@ import type {
   ValienteUbicacion,
   ValienteSalud,
   ValienteEducacion,
-  ValienteOcupacion,
   ValienteContextoFamiliar,
   Acudiente,
 } from '../../types/database.types';
@@ -29,6 +28,7 @@ export type UbicacionCSVRow = Omit<
 > & {
   ciudad_nombre: string | null;
   barrio_nombre: string | null;
+  comuna_numero: string | null;  // numero de comuna del CSV, se resuelve a ID en el servicio
 };
 
 export type SaludCSVRow = Omit<
@@ -40,25 +40,27 @@ export type SaludCSVRow = Omit<
 
 export type EducacionCSVRow = Omit<
   ValienteEducacion,
-  'valiente_id' | 'updated_at' | 'institucion_id' | 'jornada'
+  'valiente_id' | 'updated_at' | 'institucion_id'
 > & {
   institucion_nombre: string | null;  // texto para resolver a ID en el servicio
 };
 
-export type OcupacionCSVRow = Omit<
-  ValienteOcupacion,
-  'valiente_id' | 'updated_at' | 'horario_trabajo' | 'cargo' | 'tipo_empleo' | 'actividades_extracurriculares'
->;
-
 export type ContextoFamiliarCSVRow = Omit<
   ValienteContextoFamiliar,
-  'valiente_id' | 'updated_at' | 'factores_protectores' | 'factores_riesgo'
+  'valiente_id' | 'updated_at'
 >;
 
 export type AcudienteCSVRow = Omit<
   Acudiente,
-  'id' | 'created_at' | 'updated_at' | 'telefono_fijo' | 'email'
->;
+  'id' | 'created_at' | 'updated_at'
+> & {
+  // Campos adicionales que vienen del CSV pero no estan en la tabla acudiente
+  sexo: string | null;
+  edad: number | null;
+  ocupacion: string | null;
+  tipo_empleo: string | null;
+  grupo_vulnerabilidad: string | null;
+};
 
 export type ValienteAcudienteCSVRow = {
   parentesco: string;
@@ -67,15 +69,28 @@ export type ValienteAcudienteCSVRow = {
   vive_con_valiente: boolean;
 };
 
+export type ValienteProgramaCSVRow = {
+  programa_codigo: string;  // 'TRIBU' o 'SOROCA'
+  tipo_programa: string;    // 'Rugby', 'Ultimate', 'Mundo Cotidiano', 'Soñar', 'Romper', 'Cambiar'
+};
+
+export type ValientePerfilDeportivoCSVRow = {
+  disciplina: string | null;           // 'Rugby' o 'Ultimate'
+  talla_guayos: string | null;
+  talla_camisa: string | null;
+  talla_pantalon: string | null;
+};
+
 export interface ParsedRow {
   valiente: ValienteCSVRow;
   ubicacion: UbicacionCSVRow;
   salud: SaludCSVRow;
   educacion: EducacionCSVRow;
-  ocupacion: OcupacionCSVRow;
   contexto_familiar: ContextoFamiliarCSVRow;
   acudiente: AcudienteCSVRow | null;
   valiente_acudiente: ValienteAcudienteCSVRow | null;
+  programa: ValienteProgramaCSVRow;
+  perfil_deportivo: ValientePerfilDeportivoCSVRow | null;
 }
 
 export interface RowError {
@@ -88,6 +103,116 @@ export interface ParseResult {
   valid: ParsedRow[];
   invalid: RowError[];
 }
+
+// =========================================================
+// COLUMNAS DEL CSV
+// =========================================================
+
+type ColumnRef = string | readonly string[];
+type HeaderIndex = Record<string, number[]>;
+
+export const CSV_COLUMNS = {
+  programa: 'Programa',
+  tipo: 'Tipo',
+  tallaGuayos: 'Talla Guayos',
+  tallaCamiseta: 'Talla Camiseta',
+
+  nivelEducativo: 'Nivel en el que te encuentras actualmente:',
+  nombres: 'Nombre(s)',
+  apellidos: 'Apellidos',
+  apodo: 'Apodo',
+  genero: 'Género',
+  fechaNacimiento: 'Fecha de nacimiento',
+  lugarNacimiento: 'Lugar de nacimiento',
+  nacionalidad: 'NACIONALIDAD',
+  edad: 'Edad',
+  tipoDocumentoValiente: [
+    'Tipo de documento de identificación',
+    'Tipo de documento',
+  ],
+  numeroDocumentoValiente: [
+    'Número de identificación (sin comas ni puntos)',
+    'Número de identificación',
+  ],
+
+  ciudad: 'Ciudad en la que vive',
+  barrio: 'Barrio o corregimiento donde vive',
+  comuna: 'Comuna',
+  estrato: 'Estrato socioeconómico',
+  direccion: 'Dirección',
+  telefono: 'Número de teléfono',
+  email: 'Email',
+
+  escolaridad: 'Escolaridad (grado o programa que estés cursando actualmente)',
+  colegio: 'Colegio en el que estudia (o estudió para los de Mundo cotidiano)',
+  colegioOtra: 'Si tu respuesta anterior fue otra, indica cuál colegio:',
+  programaPregrado: 'En el caso de que estés cursando un programa de pregrado universitario o programa técnico o tecnológico ¿cuál?',
+  institucionEducativa: 'En el caso de que estés cursando un programa de pregrado universitario o programa técnico o tecnológico ¿En qué institución educativa?',
+  materiaFavorita: '¿Qué temática o curso del colegio o institución universitaria disfrutas más?',
+  materiaDificil: '¿Qué temática o curso del colegio o institución universitaria es más difícil para ti?',
+  responsabilidadEspecial: '¿Tienes alguna responsabilidad especial diferente al estudio?',
+  organizaciones: '¿Perteneces a alguna organización, equipos o clubes dentro y fuera de la Institución educativa? (diferente a Soroca) ¿Cuáles?',
+  hobbies: '¿Qué te gusta hacer en tu tiempo libre? (además de pasar tiempo con tus amistades)',
+  trabaja: '¿Actualmente, te encuentras trabajando?',
+  laboresTrabajo: 'En caso de haber respondido afirmativamente en la respuesta anterior, escribe qué labores desempeñas, dónde y hace cuánto',
+  carrerasInteres: '¿Qué carreras/profesiones/oficios te interesaría que podrías estudiar/aprender? (si ya lo estás estudiando puedes responder "lo estoy haciendo")',
+
+  afiliadoEps: '¿Estás actualmente afiliado a EPS?',
+  eps: 'Nombre de la EPS',
+  epsOtra: 'En caso de haber respondido OTRA en la respuesta anterior, indique el nombre de la EPS',
+  ipsUrgencias: 'Nombre de la IPS donde es atendido/a por urgencias',
+  certificadoEps: 'Adjunta certificado EPS',
+  tipoSangre: 'Tipo de sangre',
+  presentaDiscapacidad: '¿Presenta alguna discapacidad?',
+  tipoDiscapacidad: 'En caso de haber respondido afirmativamente la respuesta anterior, seleccione ¿Cuál?',
+  cuentaDiagnostico: '¿Cuenta con algún diagnóstico médico de enfermedad, discapacidad, limitación o tratamiento?',
+  diagnostico: 'En caso de haber respondido afirmativamente en la respuesta anterior, ¿Cuál?',
+  tieneAlergia: '¿Tiene alguna alergia?',
+  alergias: 'En caso de haber respondido afirmativamente en la respuesta anterior, ¿a qué reaccionas con alergia?',
+  tratamiento: '¿Se encuentra en tratamiento médico y/o farmacológico? Descríbalo',
+
+  composicionFamiliar: 'Composición familiar (¿Con quiénes vives en tu casa?)',
+  numeroPersonasHogar: '¿Cuántas personas viven en tu casa? incluyéndote',
+  ingresoMensualHogar: 'Ingresos Familiares mensuales   (salario mínimo vigente a 2025 $1.423.000)',
+  victimaConflicto: '¿Fuiste víctima del conflicto armado?',
+  inscritoRuv: '¿Te encuentras inscrito/a en el Registro Único de Víctimas?',
+  etnia: '¿Con qué etnia te identificas?',
+  familiaBuscaEmpleo: '¿Alguien de tu familia/red de apoyo primario están buscando empleo?',
+  recomendacionCompromisoValle: 'La Fundación Ser para Ser, al ser aliada de Compromiso Valle, tiene la posiblidad de recomendar . En caso de responder a la anterior pregunta si. Bríndanos su nombre, parentesco y número de contacto.',
+
+  nombreAcudiente: 'Nombres  y apellidos de tu acudiente principal',
+  tipoDocumentoAcudiente: 'Tipo de documento de identidad',
+  numeroDocumentoAcudiente: 'Número de documento de identidad (sin comas ni puntos)',
+  telefonoAcudiente: 'Número de teléfono 2',
+  generoAcudiente: 'Género 2',
+  parentescoAcudiente: 'Parentesco',
+  edadAcudiente: 'Edad 2',
+  trabajaAcudiente: '¿Trabaja actualmente?',
+  laborAcudiente: '¿Qué labor desempeña?',
+  tipoVinculacionAcudiente: 'Tipo de vinculación laboral',
+  grupoPoblacionalAcudiente: '¿Con qué grupo poblacional te identificas?',
+
+  nombreAcudienteSecundario: 'Nombres  y apellidos',
+  tipoDocumentoAcudienteSecundario: 'Tipo de documento de identidad 2',
+  numeroDocumentoAcudienteSecundario: 'Número de documento de identidad (sin comas ni puntos) 2',
+  edadAcudienteSecundario: 'Edad 3',
+  telefonoAcudienteSecundario: 'Número de teléfono 3',
+  generoAcudienteSecundario: 'Género 3',
+  parentescoAcudienteSecundario: 'Parentesco  2',
+  trabajaAcudienteSecundario: '¿Trabaja actualmente? 2',
+  laborAcudienteSecundario: '¿Qué labor desempeña? 2',
+  tipoVinculacionAcudienteSecundario: 'Tipo de vinculación laboral  2',
+  grupoPoblacionalAcudienteSecundario: '¿Con qué grupo poblacional te identificas? 2',
+
+  autorizacionFirmada: 'Se tiene la autorización firmada por el acudiente en documento físico',
+  parentescoAutorizacion: 'Parentesco  3',
+  regimenAfiliacion: 'Régimen de afiliación',
+  nacionalidad2: 'Nacionalidad2',
+  nacionalidadOtra: 'En el caso de que hayas respondido otra en la pregunta anterior, indique ¿cuál?',
+  idDocumentoDrive: 'ID. DOCUMENTO SUBIDO DRIVE',
+  epsSubidoDrive: 'EPS. SUBIDO AL DRIVE',
+  consentimientoSubidoDrive: 'CONSENTIMIENTO SUBIDO AL DRIVE',
+} as const;
 
 // =========================================================
 // HELPERS DE MAPEO DE VALORES
@@ -120,7 +245,20 @@ function mapNivelEducativo(raw: string): string | null {
 }
 
 function mapBool(raw: string): boolean {
-  return raw.trim().toLowerCase() === 'sí' || raw.trim().toLowerCase() === 'si';
+  const v = raw.trim().toLowerCase();
+  return v === 'sí' || v === 'si';
+}
+
+function parseInteger(raw: string): number | null {
+  const v = raw.trim();
+  if (!v) return null;
+
+  const parsed = parseInt(v, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function cleanDocument(raw: string): string {
+  return raw.replace(/[.,]/g, '').trim();
 }
 
 // =========================================================
@@ -131,7 +269,7 @@ export function parseDate(raw: string): string | null {
   if (!raw?.trim()) return null;
   const s = raw.trim();
 
-  // Ya está en formato ISO
+  // Ya esta en formato ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
   // DD/MM/YYYY o DD-MM-YYYY
@@ -141,7 +279,7 @@ export function parseDate(raw: string): string | null {
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
 
-  // Intentar con Date nativo como último recurso
+  // Intentar con Date nativo como ultimo recurso
   const parsed = new Date(s);
   if (!isNaN(parsed.getTime())) {
     return parsed.toISOString().split('T')[0];
@@ -161,8 +299,15 @@ export function splitCSVLine(line: string, sep: string): string[] {
 
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
+
     if (ch === '"') {
-      inQuotes = !inQuotes;
+      // Maneja comillas escapadas dentro de un campo: "" -> "
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if (ch === sep && !inQuotes) {
       result.push(current);
       current = '';
@@ -170,21 +315,95 @@ export function splitCSVLine(line: string, sep: string): string[] {
       current += ch;
     }
   }
+
   result.push(current);
   return result;
 }
 
 // =========================================================
-// NORMALIZACIÓN DE NOMBRES DE COLUMNA
+// NORMALIZACION Y LECTURA DE COLUMNAS
 // =========================================================
 
 function normalize(s: string): string {
   return s
+    .replace(/^\uFEFF/, '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+}
+
+function columnNames(column: ColumnRef): readonly string[] {
+  return typeof column === 'string' ? [column] : column;
+}
+
+function buildHeaderIndex(headers: string[]): HeaderIndex {
+  const headerIndex: HeaderIndex = {};
+
+  headers.forEach((header, idx) => {
+    const key = normalize(header);
+    if (!key) return;
+
+    if (!headerIndex[key]) {
+      headerIndex[key] = [];
+    }
+
+    headerIndex[key].push(idx);
+  });
+
+  return headerIndex;
+}
+
+function getHeaderIndexes(headerIndex: HeaderIndex, column: ColumnRef): number[] {
+  for (const name of columnNames(column)) {
+    const indexes = headerIndex[normalize(name)];
+    if (indexes?.length) {
+      return indexes;
+    }
+  }
+
+  return [];
+}
+
+function hasHeader(headerIndex: HeaderIndex, column: ColumnRef): boolean {
+  return getHeaderIndexes(headerIndex, column).length > 0;
+}
+
+function columnDisplayName(column: ColumnRef): string {
+  return columnNames(column)[0] ?? '';
+}
+
+function valueAt(cols: string[], idx: number | undefined): string {
+  if (idx === undefined || idx < 0) return '';
+  return cols[idx]?.trim() ?? '';
+}
+
+function getColumnValue(
+  cols: string[],
+  headerIndex: HeaderIndex,
+  column: ColumnRef,
+  occurrence = 0,
+): string {
+  const idx = getHeaderIndexes(headerIndex, column)[occurrence];
+  return valueAt(cols, idx);
+}
+
+function getColumnValueAfter(
+  cols: string[],
+  headerIndex: HeaderIndex,
+  column: ColumnRef,
+  afterColumn: ColumnRef,
+  fallbackOccurrence = 0,
+): string {
+  const afterIdx = getHeaderIndexes(headerIndex, afterColumn)[0];
+  const indexes = getHeaderIndexes(headerIndex, column);
+
+  const idx = afterIdx === undefined
+    ? indexes[fallbackOccurrence]
+    : indexes.find(candidate => candidate > afterIdx) ?? indexes[fallbackOccurrence];
+
+  return valueAt(cols, idx);
 }
 
 // =========================================================
@@ -195,39 +414,60 @@ export function parseCSV(text: string): ParseResult {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
   if (lines.length < 2) return { valid: [], invalid: [] };
 
-  // Detectar separador (punto y coma o coma)
+  // Detectar separador: punto y coma o coma
   const separator = lines[0].includes(';') ? ';' : ',';
 
-  // Construir mapa de encabezados: nombre normalizado → índice
+  // Construir mapa de encabezados normalizados a indices.
+  // Guarda todos los indices para soportar encabezados repetidos, por ejemplo: Email.
   const rawHeaders = splitCSVLine(lines[0], separator);
-  const headerIndex: Record<string, number> = {};
-  rawHeaders.forEach((header, idx) => {
-    headerIndex[normalize(header)] = idx;
-  });
+  const headerIndex = buildHeaderIndex(rawHeaders);
 
-  // Saltar la fila de encabezados (fila 0), parsear desde fila 1
+  const requiredHeaders: ColumnRef[] = [
+    CSV_COLUMNS.nombres,
+    CSV_COLUMNS.apellidos,
+    CSV_COLUMNS.numeroDocumentoValiente,
+    CSV_COLUMNS.fechaNacimiento,
+  ];
+
+  const missingHeaders = requiredHeaders
+    .filter(column => !hasHeader(headerIndex, column))
+    .map(columnDisplayName);
+
+  if (missingHeaders.length > 0) {
+    return {
+      valid: [],
+      invalid: [{
+        rowNumber: 1,
+        reason: `Encabezados requeridos faltantes: ${missingHeaders.join(', ')}`,
+      }],
+    };
+  }
+
   const valid: ParsedRow[] = [];
   const invalid: RowError[] = [];
 
+  // Saltar la fila de encabezados, fila 0, y parsear desde la fila 1
   for (let i = 1; i < lines.length; i++) {
-    const rowNumber = i + 1; // +1 porque la fila 1 es el encabezado
+    const rowNumber = i + 1;
     const cols = splitCSVLine(lines[i], separator);
 
-    const c = (idx: number): string => cols[idx]?.trim() ?? '';
-    const h = (colName: string): string =>
-      cols[headerIndex[normalize(colName)] ?? -1]?.trim() ?? '';
+    const h = (column: ColumnRef, occurrence = 0): string =>
+      getColumnValue(cols, headerIndex, column, occurrence);
 
-    // ── Validar campos requeridos ──────────────────────────
-    const nombres = c(1);
-    const apellidos = c(2);
-    const numeroDocumento = c(9).replace(/[.,]/g, '');
-    const rawFecha = c(4);
+    const hAfter = (column: ColumnRef, afterColumn: ColumnRef, fallbackOccurrence = 0): string =>
+      getColumnValueAfter(cols, headerIndex, column, afterColumn, fallbackOccurrence);
+
+    // Validar campos requeridos
+    const nombres = h(CSV_COLUMNS.nombres);
+    const apellidos = h(CSV_COLUMNS.apellidos);
+    const numeroDocumento = cleanDocument(h(CSV_COLUMNS.numeroDocumentoValiente));
+    const rawFecha = h(CSV_COLUMNS.fechaNacimiento);
 
     const missing: string[] = [];
-    if (!nombres)         missing.push('nombres');
-    if (!apellidos)       missing.push('apellidos');
+    if (!nombres) missing.push('nombres');
+    if (!apellidos) missing.push('apellidos');
     if (!numeroDocumento) missing.push('numero_documento');
-    if (!rawFecha)        missing.push('fecha_nacimiento');
+    if (!rawFecha) missing.push('fecha_nacimiento');
 
     if (missing.length > 0) {
       invalid.push({
@@ -248,62 +488,84 @@ export function parseCSV(text: string): ParseResult {
       continue;
     }
 
-    // ── VALIENTE ──────────────────────────────────────────
+    // PROGRAMA Y PERFIL DEPORTIVO
+    const programaRaw = h(CSV_COLUMNS.programa);
+    const tipoRaw = h(CSV_COLUMNS.tipo);
+    const tallaGuayos = h(CSV_COLUMNS.tallaGuayos);
+    const tallaCamiseta = h(CSV_COLUMNS.tallaCamiseta);
+
+    const programa: ValienteProgramaCSVRow = {
+      programa_codigo: programaRaw || 'SOROCA',
+      tipo_programa: tipoRaw || '',
+    };
+
+    const esTribu = programa.programa_codigo.trim().toUpperCase() === 'TRIBU';
+    const perfil_deportivo: ValientePerfilDeportivoCSVRow | null = esTribu ? {
+      disciplina: tipoRaw || null,
+      talla_guayos: tallaGuayos || null,
+      talla_camisa: tallaCamiseta || null,
+      talla_pantalon: null,
+    } : null;
+
+    // VALIENTE
+    const trabajaRaw = h(CSV_COLUMNS.trabaja);
+
     const valiente: ValienteCSVRow = {
-      tipo_documento:   mapTipoDocumento(c(8)),
+      tipo_documento:   mapTipoDocumento(h(CSV_COLUMNS.tipoDocumentoValiente)),
       numero_documento: numeroDocumento,
       nombres,
       apellidos,
-      apodo:            null,
+      apodo:            h(CSV_COLUMNS.apodo) || null,
       fecha_nacimiento: fechaParsed,
-      sexo:             mapSexo(c(3)),
-      identidad_genero: c(3) || null,
-      celular:          c(15) || null,
-      telefono_fijo:    null,
-      email:            null,
-      redes_sociales:   null,
-      lugar_nacimiento: c(5) || null,
-      nacionalidad:     c(6) || null,
+      sexo:             mapSexo(h(CSV_COLUMNS.genero)),
+      identidad_genero: h(CSV_COLUMNS.genero) || null,
+      celular:          h(CSV_COLUMNS.telefono) || null,
+      email:            hAfter(CSV_COLUMNS.email, CSV_COLUMNS.telefono) || null,
+      lugar_nacimiento: h(CSV_COLUMNS.lugarNacimiento) || null,
+      nacionalidad:     h(CSV_COLUMNS.nacionalidad) || null,
+      trabaja_estudia:  trabajaRaw ? (mapBool(trabajaRaw) ? 'TRABAJA' : 'ESTUDIA') : null,
+      hobbies:          h(CSV_COLUMNS.hobbies) || null,
       estado:           'ACTIVO',
       foto_url:         null,
       created_by:       null,
       updated_by:       null,
     };
 
-    // ── UBICACIÓN ─────────────────────────────────────────
+    // UBICACION
     const ubicacion: UbicacionCSVRow = {
-      direccion:    c(14) || null,
-      estrato:      c(13) || null,
-      ciudad_nombre: c(10) || null,
-      barrio_nombre: c(11) || null,
+      direccion:     h(CSV_COLUMNS.direccion) || null,
+      estrato:       h(CSV_COLUMNS.estrato) || null,
+      ciudad_nombre: h(CSV_COLUMNS.ciudad) || null,
+      barrio_nombre: h(CSV_COLUMNS.barrio) || null,
+      comuna_numero: h(CSV_COLUMNS.comuna) || null,
     };
 
-    // ── SALUD ─────────────────────────────────────────────
-    const epsNombreRaw = h('Nombre de la EPS');
+    // SALUD
+    const epsNombreRaw = h(CSV_COLUMNS.eps);
     const epsNombre = epsNombreRaw.toLowerCase() === 'otra'
-      ? h('En caso de haber respondido OTRA en la respuesta anterior, indique el nombre de la EPS')
+      ? h(CSV_COLUMNS.epsOtra)
       : epsNombreRaw;
 
     const salud: SaludCSVRow = {
       eps_nombre:                     epsNombre || null,
-      ips_nombre:                     h('Nombre de la IPS donde es atendido/a por urgencias') || null,
-      tipo_sangre:                    h('Tipo de sangre') || null,
-      tiene_discapacidad:             mapBool(h('¿Presenta alguna discapacidad?')),
-      tipo_discapacidad:              h('En caso de haber respondido afirmativamente la respuesta anterior, seleccione ¿Cuál?') || null,
-      diagnostico_medico:             h('En caso de haber respondido afirmativamente en la respuesta anterior, ¿Cuál?') || null,
-      tiene_alergias:                 mapBool(h('¿Tiene alguna alergia?')),
-      alergias:                       h('En caso de haber respondido afirmativamente en la respuesta anterior, ¿a qué reaccionas con alergia?') || null,
+      ips_nombre:                     h(CSV_COLUMNS.ipsUrgencias) || null,
+      tipo_sangre:                    h(CSV_COLUMNS.tipoSangre) || null,
+      tiene_discapacidad:             mapBool(h(CSV_COLUMNS.presentaDiscapacidad)),
+      tipo_discapacidad:              h(CSV_COLUMNS.tipoDiscapacidad) || null,
+      diagnostico_medico:             h(CSV_COLUMNS.diagnostico) || null,
+      tiene_alergias:                 mapBool(h(CSV_COLUMNS.tieneAlergia)),
+      alergias:                       h(CSV_COLUMNS.alergias) || null,
       medicamentos_actuales:          null,
-      tratamiento_en_curso:           h('¿Se encuentra en tratamiento médico y/o farmacológico? Descríbalo') || null,
+      tratamiento_en_curso:           h(CSV_COLUMNS.tratamiento) || null,
       contacto_emergencia_nombre:     null,
       contacto_emergencia_telefono:   null,
       contacto_emergencia_parentesco: null,
     };
 
-    // ── EDUCACIÓN ─────────────────────────────────────────
-    const colegio = h('Colegio en el que estudia (o estudió para los de Mundo cotidiano)');
-    const colegioOtra = h('Si tu respuesta anterior fue otra, indica cuál colegio:');
-    const institucionUniversitaria = h('En el caso de que estés cursando un programa de pregrado universitario o programa técnico o tecnológico ¿En qué institución educativa?');
+    // EDUCACION
+    const colegio = h(CSV_COLUMNS.colegio);
+    const colegioOtra = h(CSV_COLUMNS.colegioOtra);
+    const institucionUniversitaria = h(CSV_COLUMNS.institucionEducativa);
 
     let institucionNombre: string | null = null;
     if (colegio && colegio.toLowerCase() !== 'otra') {
@@ -314,67 +576,56 @@ export function parseCSV(text: string): ParseResult {
       institucionNombre = institucionUniversitaria;
     }
 
+    const gradoOPrograma = h(CSV_COLUMNS.escolaridad) || h(CSV_COLUMNS.programaPregrado);
+
     const educacion: EducacionCSVRow = {
-      nivel_educativo:               mapNivelEducativo(h('Nivel en el que te encuentras actualmente:')),
-      grado_actual:                  h('Escolaridad (grado o programa que estés cursando actualmente)') || null,
-      materia_favorita:              h('¿Qué temática o curso del colegio o institución universitaria disfrutas más?') || null,
-      materia_dificil:               h('¿Qué temática o curso del colegio o institución universitaria es más difícil para ti?') || null,
-      actividades_extracurriculares: h('¿Perteneces a alguna organización, equipos o clubes dentro y fuera de la Institución educativa? (diferente a Soroca) ¿Cuáles?') || null,
-      institucion_nombre:            institucionNombre,
+      nivel_educativo:    mapNivelEducativo(h(CSV_COLUMNS.nivelEducativo)),
+      grado_actual:       gradoOPrograma || null,
+      materia_favorita:   h(CSV_COLUMNS.materiaFavorita) || null,
+      materia_dificil:    h(CSV_COLUMNS.materiaDificil) || null,
+      institucion_nombre: institucionNombre,
     };
 
-    // ── OCUPACIÓN ─────────────────────────────────────────
-    const ocupacion: OcupacionCSVRow = {
-      esta_trabajando:              mapBool(c(26)),
-      lugar_trabajo:                c(27) || null,
-      otras_responsabilidades:      c(23) || null,
-      hobbies:                      c(25) || null,
-      intereses_profesionales:      c(28) || null,
-    };
-
-    // ── CONTEXTO FAMILIAR ─────────────────────────────────
-    const numPersonas = c(43) ? parseInt(c(43), 10) : null;
+    // CONTEXTO FAMILIAR
+    const numPersonas = parseInteger(h(CSV_COLUMNS.numeroPersonasHogar));
 
     const contexto_familiar: ContextoFamiliarCSVRow = {
-      composicion_familiar:      c(42) || null,
-      numero_personas_hogar:     isNaN(numPersonas as number) ? null : numPersonas,
-      ingreso_mensual_hogar:     c(44) || null,
-      es_victima_conflicto:      mapBool(c(45)),
-      esta_en_ruv:               mapBool(c(46)),
-      etnia:                     c(47) || null,
-      familia_busca_empleo:      mapBool(c(48)),
-      detalles_buscador_empleo:  c(49) || null,
+      composicion_familiar:  h(CSV_COLUMNS.composicionFamiliar) || null,
+      numero_personas_hogar: numPersonas,
+      ingreso_mensual_hogar: h(CSV_COLUMNS.ingresoMensualHogar) || null,
+      es_victima_conflicto:  mapBool(h(CSV_COLUMNS.victimaConflicto)),
+      esta_en_ruv:           mapBool(h(CSV_COLUMNS.inscritoRuv)),
+      etnia:                 h(CSV_COLUMNS.etnia) || null,
     };
 
-    // ── ACUDIENTE ─────────────────────────────────────────
+    // ACUDIENTE PRINCIPAL
     let acudiente: AcudienteCSVRow | null = null;
     let valiente_acudiente: ValienteAcudienteCSVRow | null = null;
 
-    const nombreAcudiente = c(50);
+    const nombreAcudiente = h(CSV_COLUMNS.nombreAcudiente);
     if (nombreAcudiente) {
-      const edadAcudienteRaw = c(56);
-      const edadAcudiente = edadAcudienteRaw ? parseInt(edadAcudienteRaw, 10) : null;
-
-      // La ocupación del acudiente: si col 57 indica que trabaja, usar col 58 como descripción
-      const trabajaAcudiente = c(57);
-      const laborAcudiente = c(58);
-      const ocupacionAcudiente = laborAcudiente || trabajaAcudiente || null;
+      const edadAcudiente = parseInteger(h(CSV_COLUMNS.edadAcudiente));
+      const tipoDocumentoAcudiente = h(CSV_COLUMNS.tipoDocumentoAcudiente);
+      const numeroDocumentoAcudiente = cleanDocument(h(CSV_COLUMNS.numeroDocumentoAcudiente));
 
       acudiente = {
-        nombre_completo:           nombreAcudiente,
-        tipo_documento:            c(51) ? mapTipoDocumento(c(51)) : null,
-        numero_documento:          c(52) || null,
-        celular:                   c(53) || null,
-        sexo:                      mapSexo(c(54)),
-        edad:                      isNaN(edadAcudiente as number) ? null : edadAcudiente,
-        ocupacion:                 ocupacionAcudiente,
-        tipo_empleo:               c(59) || null,
-        grupo_vulnerabilidad:      c(60) || null,
-        tiene_autorizacion_firmada: mapBool(c(72)),
+        nombre_completo:            nombreAcudiente,
+        tipo_documento:             tipoDocumentoAcudiente ? mapTipoDocumento(tipoDocumentoAcudiente) : null,
+        numero_documento:           numeroDocumentoAcudiente || null,
+        celular:                    h(CSV_COLUMNS.telefonoAcudiente) || null,
+        email:                      hAfter(CSV_COLUMNS.email, CSV_COLUMNS.numeroDocumentoAcudiente, 1) || null,
+        tiene_autorizacion_firmada: mapBool(h(CSV_COLUMNS.autorizacionFirmada)),
+
+        // Campos adicionales del CSV que no estan en la tabla acudiente
+        sexo:                 mapSexo(h(CSV_COLUMNS.generoAcudiente)),
+        edad:                 edadAcudiente,
+        ocupacion:            h(CSV_COLUMNS.laborAcudiente) || null,
+        tipo_empleo:          h(CSV_COLUMNS.tipoVinculacionAcudiente) || null,
+        grupo_vulnerabilidad: h(CSV_COLUMNS.grupoPoblacionalAcudiente) || null,
       };
 
       valiente_acudiente = {
-        parentesco:             c(55) || 'OTRO',
+        parentesco:             h(CSV_COLUMNS.parentescoAcudiente) || 'OTRO',
         es_principal:           true,
         es_contacto_emergencia: true,
         vive_con_valiente:      false,
@@ -386,10 +637,11 @@ export function parseCSV(text: string): ParseResult {
       ubicacion,
       salud,
       educacion,
-      ocupacion,
       contexto_familiar,
       acudiente,
       valiente_acudiente,
+      programa,
+      perfil_deportivo,
     });
   }
 

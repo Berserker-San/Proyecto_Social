@@ -1,6 +1,5 @@
 import React from 'react';
-import { Shield, Users, HeartHandshake, Activity } from 'lucide-react';
-import { TribuIcon, SorocaIcon } from '../../components/customIcons/customIcons';
+import { Users, HeartHandshake, Activity } from 'lucide-react';
 import './WelcomeView.css';
 
 type AppContext = 'TRIBU' | 'SOROCA';
@@ -15,9 +14,6 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onSelectProgram }) => {
 
       {/* Header */}
       <div className="welcome-header">
-        <div className="welcome-logo">
-          <Shield size={40} />
-        </div>
         <h1 className="welcome-title">TRIVIUM</h1>
         <p className="welcome-subtitle">
           Sistema de Gestión Integral <strong>Ser para Ser</strong>.
@@ -31,16 +27,19 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onSelectProgram }) => {
 
           {/* TRIBU */}
           <button className="program-card program-card--tribu" onClick={() => onSelectProgram('TRIBU')}>
+            {/* Marca de agua de fondo */}
             <div className="program-card-bg">
-              <TribuIcon size={200} />
+              <img src="/images/logo-tribu.png" alt="" className="program-card-bg-img" />
             </div>
             <div className="program-card-body">
               <div className="program-card-header">
-                <div className="program-card-icon">
-                  <TribuIcon size={32} />
+                {/* Logo a la izquierda */}
+                <div className="program-card-icon program-card-icon--img">
+                  <img src="/images/logo-tribu.png" alt="Logo Tribu" className="program-logo-img" />
                 </div>
-                <div>
-                  <h3 className="program-card-name">TRIBU</h3>
+                {/* Letras arriba, badge abajo */}
+                <div className="program-card-title-block">
+                  <img src="/images/tribu-letras.png" alt="TRIBU" className="program-letras-img" />
                   <span className="program-card-badge">Deportivo</span>
                 </div>
               </div>
@@ -52,13 +51,14 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onSelectProgram }) => {
 
           {/* SOROCA */}
           <button className="program-card program-card--soroca" onClick={() => onSelectProgram('SOROCA')}>
+            {/* Marca de agua de fondo */}
             <div className="program-card-bg">
-              <SorocaIcon size={200} />
+              <img src="/images/logo-soroca.png" alt="" className="program-card-bg-img" />
             </div>
             <div className="program-card-body">
               <div className="program-card-header">
-                <div className="program-card-icon">
-                  <SorocaIcon size={32} />
+                <div className="program-card-icon program-card-icon--img">
+                  <img src="/images/logo-soroca.png" alt="Logo Soroca" className="program-logo-img" />
                 </div>
                 <div>
                   <h3 className="program-card-name">SOROCA</h3>

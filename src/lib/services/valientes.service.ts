@@ -2,12 +2,6 @@ import { supabase } from '../supabase';
 import type {
   Valiente,
   ValienteCompleto,
-  ValienteSalud,
-  ValienteUbicacion,
-  ValienteEducacion,
-  ValienteContextoFamiliar,
-  ValientePerfilDeportivo,
-  ValientePrograma,
   Acudiente,
 } from '../../types/database.types';
 
@@ -36,7 +30,7 @@ export async function getValienteById(id: number) {
     .from('valiente')
     .select(`
       *,
-      ubicacion:valiente_ubicacion(*),
+      ubicacion:valiente_ubicacion(*, comuna:comuna(nombre)),
       salud:valiente_salud(*, eps:eps(nombre), ips:ips(nombre)),
       educacion:valiente_educacion(*, institucion_educativa:institucion_educativa(nombre)),
       contexto_familiar:valiente_contexto_familiar(*),
@@ -124,8 +118,99 @@ export function calcularEdad(fechaNacimiento: string): number {
   return edad;
 }
 
+
 // =========================================================
-// DOCUMENTOS — SUPABASE STORAGE
+// HELPERS DE REGISTRO COMPLETO
+// =========================================================
+
+function isYes(value: string | boolean | null | undefined): boolean {
+  if (typeof value === 'boolean') return value;
+  return (value ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'si';
+}
+
+function cleanText(value: string | null | undefined): string | null {
+  const cleaned = (value ?? '').trim();
+  return cleaned ? cleaned : null;
+}
+
+function getValidCatalogId(id: number | null | undefined): number | null {
+  return id !== null && id !== undefined && id !== -1 ? id : null;
+}
+
+type CatalogTable = 'eps' | 'ips' | 'institucion_educativa';
+
+async function resolveCatalogId(
+  table: CatalogTable,
+  selectedId: number | null | undefined,
+  otherName: string | null | undefined,
+  label: string
+): Promise<number | null> {
+  const validId = getValidCatalogId(selectedId);
+  if (validId) return validId;
+
+  if (selectedId !== -1) return null;
+
+  const name = cleanText(otherName);
+  if (!name) return null;
+
+  const { data: existing, error: lookupError } = await supabase
+    .from(table)
+    .select('id')
+    .ilike('nombre', name)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`No se pudo consultar ${label}: ${lookupError.message}`);
+  }
+
+  if (existing) return existing.id;
+
+  const { data: inserted, error: insertError } = await supabase
+    .from(table)
+    .insert({ nombre: name })
+    .select('id')
+    .single();
+
+  if (insertError || !inserted) {
+    throw new Error(`No se pudo crear ${label}: ${insertError?.message ?? 'sin ID retornado'}`);
+  }
+
+  return inserted.id;
+}
+
+type OneToOneTable =
+  | 'valiente_ubicacion'
+  | 'valiente_salud'
+  | 'valiente_educacion'
+  | 'valiente_contexto_familiar'
+  | 'valiente_perfil_deportivo';
+
+async function saveByValienteId(
+  table: OneToOneTable,
+  valienteId: number,
+  payload: Record<string, unknown>
+): Promise<void> {
+  const { data: existing, error: lookupError } = await supabase
+    .from(table)
+    .select('valiente_id')
+    .eq('valiente_id', valienteId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`No se pudo consultar ${table}: ${lookupError.message}`);
+  }
+
+  const response = existing
+    ? await supabase.from(table).update(payload).eq('valiente_id', valienteId)
+    : await supabase.from(table).insert(payload);
+
+  if (response.error) {
+    throw new Error(`No se pudo guardar ${table}: ${response.error.message}`);
+  }
+}
+
+// =========================================================
+// DOCUMENTOS - SUPABASE STORAGE
 // =========================================================
 
 const BUCKET = 'valiente-documentos';
@@ -176,6 +261,7 @@ export async function subirDocumentoValiente(
 export interface DatosRegistroCompleto {
   // Básico
   program: string;
+  programType?: string;
   discipline: string;
   docType: string;
   docId: string;
@@ -252,18 +338,18 @@ export interface DatosRegistroCompleto {
 /**
  * Registrar o actualizar un valiente completo.
  * Busca por tipo_documento + numero_documento:
- *   - Si existe → actualiza todos sus perfiles (upsert)
- *   - Si no existe → crea el valiente y sus perfiles
+ *   - Si existe -> actualiza todos sus perfiles (upsert)
+ *   - Si no existe -> crea el valiente y sus perfiles
  * Devuelve el valiente resultante y si fue creado o actualizado.
  */
 export async function registrarValienteCompleto(
   datos: DatosRegistroCompleto
 ): Promise<{ valiente: Valiente; esNuevo: boolean }> {
 
-  // ── 1. Buscar valiente existente ──────────────────────
+  // -- 1. Buscar valiente existente ----------------------
   const existente = await buscarValientePorDocumento(datos.docType, datos.docId);
 
-  // ── 2. Crear o actualizar valiente base ───────────────
+  // -- 2. Crear o actualizar valiente base ---------------
   const datosBase: Omit<Valiente, 'id' | 'created_at' | 'updated_at' | 'nombre_completo'> = {
     tipo_documento: datos.docType,
     numero_documento: datos.docId,
@@ -300,118 +386,155 @@ export async function registrarValienteCompleto(
 
   const valienteId = valiente.id;
 
-  // ── 3. Ubicación ──────────────────────────────────────
-  const ubicacion: Omit<ValienteUbicacion, 'updated_at'> = {
+  // -- 3. Ubicación ----------------------------------------
+  const ubicacion = {
     valiente_id: valienteId,
-    direccion: datos.address || null,
-    ciudad_id: datos.cityId ?? null,
-    comuna_id: datos.communeId ?? null,
-    estrato: datos.stratum || null,
+    direccion: cleanText(datos.address),
+    ciudad_id: getValidCatalogId(datos.cityId),
+    comuna_id: getValidCatalogId(datos.communeId),
+    estrato: cleanText(datos.stratum),
     latitud: null,
     longitud: null,
   };
-  await supabase.from('valiente_ubicacion').upsert(ubicacion);
+  await saveByValienteId('valiente_ubicacion', valienteId, ubicacion);
 
-  // ── 4. Salud ──────────────────────────────────────────
-  const salud: Omit<ValienteSalud, 'updated_at'> = {
+  // -- 4. Salud -------------------------------------------
+  const [epsId, ipsId] = await Promise.all([
+    resolveCatalogId('eps', datos.epsId, datos.epsOther, 'la EPS'),
+    resolveCatalogId('ips', datos.ipsId, datos.ipsOther, 'la IPS'),
+  ]);
+
+  const salud = {
     valiente_id: valienteId,
-    eps_id: datos.epsId !== null && datos.epsId !== -1 ? datos.epsId : null,
-    ips_id: datos.ipsId !== null && datos.ipsId !== -1 ? datos.ipsId : null,
-    ips_nombre: datos.ipsId === -1 ? (datos.ipsOther || null) : null,
-    eps_nombre: datos.epsId === -1 ? (datos.epsOther || null) : null,
-    tipo_sangre: datos.bloodType || null,
-    tiene_discapacidad: datos.hasDisability === 'Si',
-    tipo_discapacidad: datos.hasDisability === 'Si' ? datos.disabilityDetails || null : null,
+    eps_id: epsId,
+    ips_id: ipsId,
+    tipo_sangre: cleanText(datos.bloodType),
+    tiene_discapacidad: isYes(datos.hasDisability),
+    tipo_discapacidad: isYes(datos.hasDisability) ? cleanText(datos.disabilityDetails) : null,
     diagnostico_medico: null,
-    tiene_alergias: datos.hasAllergy === 'Si',
-    alergias: datos.hasAllergy === 'Si' ? datos.allergyDetails || null : null,
-    medicamentos_actuales: datos.hasMedication === 'Si' ? datos.medicationDetails || null : null,
-    tratamiento_en_curso: null,
+    tiene_alergias: isYes(datos.hasAllergy),
+    alergias: isYes(datos.hasAllergy) ? cleanText(datos.allergyDetails) : null,
+    medicamentos_actuales: isYes(datos.hasMedication) ? cleanText(datos.medicationDetails) : null,
+    tratamiento_en_curso: isYes(datos.hasMedication) ? cleanText(datos.medicationDetails) : null,
     contacto_emergencia_nombre: null,
     contacto_emergencia_telefono: null,
     contacto_emergencia_parentesco: null,
   };
-  await supabase.from('valiente_salud').upsert(salud);
+  await saveByValienteId('valiente_salud', valienteId, salud);
 
-  // ── 5. Educación ──────────────────────────────────────
-  const educacion: Omit<ValienteEducacion, 'updated_at'> = {
+  // -- 5. Educación ---------------------------------------
+  const institucionId = await resolveCatalogId(
+    'institucion_educativa',
+    datos.schoolId,
+    datos.schoolOther || datos.schoolName,
+    'la institución educativa'
+  );
+
+  const educacion = {
     valiente_id: valienteId,
-    nivel_educativo: datos.educationLevel || null,
-    grado_actual: datos.grade || null,
-    institucion_id: datos.schoolId !== null && datos.schoolId !== -1 ? datos.schoolId : null,
-    materia_favorita: datos.favSubject || null,
-    materia_dificil: datos.hardSubject || null,
+    nivel_educativo: cleanText(datos.educationLevel),
+    grado_actual: cleanText(datos.grade),
+    institucion_id: institucionId,
+    materia_favorita: cleanText(datos.favSubject),
+    materia_dificil: cleanText(datos.hardSubject),
   };
-  await supabase.from('valiente_educacion').upsert(educacion);
+  await saveByValienteId('valiente_educacion', valienteId, educacion);
 
-  // ── 6. Contexto familiar ──────────────────────────────
-  const contexto: Omit<ValienteContextoFamiliar, 'updated_at'> = {
+  // -- 6. Contexto familiar -------------------------------
+  const familyCount = datos.familyCount ? parseInt(datos.familyCount, 10) : null;
+  const contexto = {
     valiente_id: valienteId,
-    composicion_familiar: datos.familyComposition || null,
-    numero_personas_hogar: datos.familyCount ? parseInt(datos.familyCount, 10) : null,
-    ingreso_mensual_hogar: datos.familyIncome || null,
-    es_victima_conflicto: datos.isConflictVictim === 'Si',
-    esta_en_ruv: datos.isRUV === 'Si',
+    composicion_familiar: cleanText(datos.familyComposition),
+    numero_personas_hogar: Number.isNaN(familyCount) ? null : familyCount,
+    ingreso_mensual_hogar: cleanText(datos.familyIncome),
+    es_victima_conflicto: isYes(datos.isConflictVictim),
+    esta_en_ruv: isYes(datos.isRUV),
     etnia: datos.ethnicity === 'Otro'
-      ? datos.ethnicityOther || null
-      : datos.ethnicity || null,
-    factores_protectores: null,
-    factores_riesgo: null,
-    familia_busca_empleo: false,
-    detalles_buscador_empleo: null,
+      ? cleanText(datos.ethnicityOther)
+      : cleanText(datos.ethnicity),
   };
-  await supabase.from('valiente_contexto_familiar').upsert(contexto);
+  await saveByValienteId('valiente_contexto_familiar', valienteId, contexto);
 
-  // ── 8. Perfil deportivo ───────────────────────────────
-  const perfilDeportivo: Omit<ValientePerfilDeportivo, 'updated_at'> = {
-    valiente_id: valienteId,
-    disciplina: datos.discipline || null,
-    tiene_experiencia_previa: datos.rugbyBackground === 'Si',
-    experiencia_previa: datos.rugbyBackground === 'Si' ? 'Experiencia previa' : null,
-    talla_guayos: datos.shoeSize || null,
-    talla_camisa: datos.shirtSize || null,
-    talla_pantalon: datos.pantalonSize || null,
-    horario_entrenamiento: datos.trainingDays.length > 0 ? datos.trainingDays : null,
-  };
-  await supabase.from('valiente_perfil_deportivo').upsert(perfilDeportivo);
+  // -- 7. Perfil deportivo, solo TRIBU --------------------
+  if (datos.program === 'TRIBU') {
+    const perfilDeportivo = {
+      valiente_id: valienteId,
+      disciplina: cleanText(datos.discipline),
+      tiene_experiencia_previa: isYes(datos.rugbyBackground),
+      experiencia_previa: isYes(datos.rugbyBackground) ? 'Experiencia previa' : null,
+      talla_guayos: cleanText(datos.shoeSize),
+      talla_camisa: cleanText(datos.shirtSize),
+      talla_pantalon: cleanText(datos.pantalonSize),
+      horario_entrenamiento: datos.trainingDays.length > 0 ? datos.trainingDays : null,
+    };
+    await saveByValienteId('valiente_perfil_deportivo', valienteId, perfilDeportivo);
+  } else {
+    const { error: deletePerfilError } = await supabase
+      .from('valiente_perfil_deportivo')
+      .delete()
+      .eq('valiente_id', valienteId);
 
-  // ── 9. Programa ───────────────────────────────────────
-  // Buscar el programa por código para obtener su ID
-  const { data: programaData } = await supabase
+    if (deletePerfilError) {
+      throw new Error(`No se pudo limpiar el perfil deportivo: ${deletePerfilError.message}`);
+    }
+  }
+
+  // -- 8. Programa ----------------------------------------
+  const { data: programaData, error: programaError } = await supabase
     .from('programa')
     .select('id')
     .eq('codigo', datos.program)
     .maybeSingle();
 
+  if (programaError) throw programaError;
+
   if (programaData) {
-    // Verificar si ya está inscrito en este programa
-    const { data: inscripcionExistente } = await supabase
+    const nivelPrograma = datos.program === 'SOROCA'
+      ? cleanText(datos.programType)
+      : cleanText(datos.discipline);
+
+    const { data: inscripcionExistente, error: inscripcionError } = await supabase
       .from('valiente_programa')
       .select('id')
       .eq('valiente_id', valienteId)
       .eq('programa_id', programaData.id)
       .maybeSingle();
 
-    if (!inscripcionExistente) {
-      const programa: Omit<ValientePrograma, 'id' | 'created_at' | 'updated_at'> = {
-        valiente_id: valienteId,
-        programa_id: programaData.id,
-        es_principal: true,
-        fecha_ingreso: new Date().toISOString().split('T')[0],
-        fecha_egreso: null,
-        estado: 'ACTIVO',
-        cohorte: null,
-        nivel: null,
-        sede: null,
-        motivacion: datos.linkage || null,
-        compromisos: null,
-        transformaciones_subjetivas: null,
-      };
-      await supabase.from('valiente_programa').insert(programa);
+    if (inscripcionError) throw inscripcionError;
+
+    const programaPayload = {
+      valiente_id: valienteId,
+      programa_id: programaData.id,
+      es_principal: true,
+      fecha_ingreso: new Date().toISOString().split('T')[0],
+      fecha_egreso: null,
+      estado: 'ACTIVO',
+      cohorte: null,
+      nivel: nivelPrograma,
+      sede: null,
+      motivacion: cleanText(datos.linkage),
+      compromisos: null,
+      transformaciones_subjetivas: null,
+    };
+
+    if (inscripcionExistente) {
+      const { error } = await supabase
+        .from('valiente_programa')
+        .update({
+          es_principal: true,
+          estado: 'ACTIVO',
+          nivel: nivelPrograma,
+          motivacion: cleanText(datos.linkage),
+        })
+        .eq('id', inscripcionExistente.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('valiente_programa').insert(programaPayload);
+      if (error) throw error;
     }
   }
 
-  // ── 10. Acudiente ─────────────────────────────────────
+  // -- 10. Acudiente -------------------------------------
   if (datos.guardianFullName) {
     let acudienteId: number | null = null;
 
@@ -424,7 +547,7 @@ export async function registrarValienteCompleto(
       .maybeSingle();
 
     if (vinculoPrincipal) {
-      // Ya existe vínculo → actualizar el acudiente existente
+      // Ya existe vínculo -> actualizar el acudiente existente
       acudienteId = vinculoPrincipal.acudiente_id;
       await supabase
         .from('acudiente')
@@ -444,7 +567,7 @@ export async function registrarValienteCompleto(
         .eq('id', vinculoPrincipal.id);
 
     } else {
-      // No existe vínculo → buscar acudiente por documento o crear uno nuevo
+      // No existe vínculo -> buscar acudiente por documento o crear uno nuevo
       if (datos.guardianDocId) {
         const { data: acudientePorDoc } = await supabase
           .from('acudiente')

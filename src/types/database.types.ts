@@ -187,6 +187,7 @@ export interface ValienteUbicacion {
   direccion: string | null;
   ciudad_id: number | null;
   comuna_id: number | null;
+  barrio_id: number | null;
   estrato: string | null;
   latitud: number | null;
   longitud: number | null;
@@ -232,10 +233,6 @@ export interface ValienteContextoFamiliar {
   es_victima_conflicto: boolean;
   esta_en_ruv: boolean;
   etnia: string | null;
-  factores_protectores: string | null;
-  factores_riesgo: string | null;
-  familia_busca_empleo: boolean;
-  detalles_buscador_empleo: string | null;
   updated_at: string;
 }
 

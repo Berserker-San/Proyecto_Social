@@ -33,6 +33,23 @@ function getInitials(nombre: string): string {
     .join('');
 }
 
+function getSorocaLogoPath(tipoPrograma: string | null | undefined): string {
+  if (!tipoPrograma) return '/images/logo-soroca.png';
+  
+  const tipo = tipoPrograma.toLowerCase().trim();
+  
+  // Mapear el tipo de programa al nombre del archivo
+  const logoMap: Record<string, string> = {
+    'soñar': '/images/soroca-sonar.png',
+    'sonar': '/images/soroca-sonar.png',
+    'romper': '/images/soroca-romper.png',
+    'cambiar': '/images/soroca-cambiar.png',
+    'mundo cotidiano': '/images/logo-soroca.png', // Pendiente, usar logo general por ahora
+  };
+  
+  return logoMap[tipo] || '/images/logo-soroca.png';
+}
+
 function getContextStyles(
   valiente: ValienteCompleto,
   context: 'GLOBAL' | 'TRIBU' | 'SOROCA'
@@ -423,14 +440,7 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 <GridItem label="Apodo" value={valiente.apodo} />
                 <GridItem label="Sexo" value={valiente.sexo} />
                 <GridItem label="Identidad Género" value={valiente.identidad_genero} />
-                <GridItem
-                  label="Redes Sociales"
-                  value={
-                    valiente.redes_sociales
-                      ? JSON.stringify(valiente.redes_sociales)
-                      : null
-                  }
-                />
+                <GridItem label="Trabaja/Estudia" value={valiente.trabaja_estudia} />
               </Section>
               <Section title="Contacto">
                 <GridItem label="Dirección" value={valiente.ubicacion?.direccion} full />
@@ -465,25 +475,13 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
 
           {/* TAB: EDUCACIÓN */}
           {activeTab === 'academic' && (
-            <div className="space-y-6">
-              <Section title="Escolaridad">
-                <GridItem label="Nivel" value={valiente.educacion?.nivel_educativo} />
-                <GridItem label="Institución" value={(valiente.educacion as any)?.institucion_educativa?.nombre ?? null} />
-                <GridItem label="Grado Actual" value={valiente.educacion?.grado_actual} />
-                <GridItem label="Materia Favorita" value={valiente.educacion?.materia_favorita} />
-                <GridItem label="Materia Difícil" value={valiente.educacion?.materia_dificil} />
-                <GridItem label="Actividades / Clubes" value={valiente.educacion?.actividades_extracurriculares} full />
-              </Section>
-              <Section title="Ocupación">
-                <GridItem
-                  label="¿Trabaja?"
-                  value={valiente.ocupacion?.esta_trabajando ? 'Sí' : 'No'}
-                />
-                {valiente.ocupacion?.esta_trabajando && (
-                  <GridItem label="Lugar de Trabajo" value={valiente.ocupacion?.lugar_trabajo} full />
-                )}
-              </Section>
-            </div>
+            <Section title="Escolaridad">
+              <GridItem label="Nivel" value={valiente.educacion?.nivel_educativo} />
+              <GridItem label="Institución" value={(valiente.educacion as any)?.institucion_educativa?.nombre ?? null} />
+              <GridItem label="Grado Actual" value={valiente.educacion?.grado_actual} />
+              <GridItem label="Materia Favorita" value={valiente.educacion?.materia_favorita} />
+              <GridItem label="Materia Difícil" value={valiente.educacion?.materia_dificil} />
+            </Section>
           )}
 
           {/* TAB: ENTORNO */}
@@ -493,7 +491,11 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
               <GridItem
                 label="Comuna"
                 value={
-                  valiente.ubicacion?.comuna_id ? `Comuna ${valiente.ubicacion.comuna_id}` : null
+                  (valiente.ubicacion as any)?.comuna?.nombre
+                    ? `${(valiente.ubicacion as any).comuna.nombre}`
+                    : valiente.ubicacion?.comuna_id
+                    ? `${valiente.ubicacion.comuna_id}`
+                    : null
                 }
               />
               <GridItem label="Etnia" value={valiente.contexto_familiar?.etnia} />
@@ -524,7 +526,6 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
               <GridItem label="Celular" value={acudientePrincipal?.celular} />
               <GridItem label="Parentesco" value={valiente.acudientes?.[0]?.parentesco} />
               <GridItem label="Email" value={acudientePrincipal?.email} />
-              <GridItem label="Ocupación" value={acudientePrincipal?.ocupacion} />
               <GridItem
                 label="Autorización Firmada"
                 value={acudientePrincipal?.tiene_autorizacion_firmada ? 'Sí' : 'No'}
@@ -536,17 +537,8 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
           {activeTab === 'ser' && (
             <div className="space-y-6">
               <Section title="Aficiones y Gustos">
-                <GridItem label="Hobbies" value={valiente.ocupacion?.hobbies} full />
-                <GridItem
-                  label="Proyecto de Vida / Intereses Profesionales"
-                  value={valiente.ocupacion?.intereses_profesionales}
-                  full
-                />
-                <GridItem
-                  label="Actividades Extracurriculares"
-                  value={valiente.ocupacion?.actividades_extracurriculares}
-                  full
-                />
+                <GridItem label="Hobbies" value={valiente.hobbies} full />
+                <GridItem label="Trabaja/Estudia" value={valiente.trabaja_estudia} />
               </Section>
               {valiente.perfil_soroca && (
                 <Section title="Perfil Soroca">
@@ -578,24 +570,6 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
               <Section title="Dossier Psicosocial">
                 <div className="col-span-2 space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-500">Factores Protectores</label>
-                    <textarea
-                      className="w-full p-2 border rounded bg-emerald-50 border-emerald-100 text-sm mt-1"
-                      rows={2}
-                      readOnly
-                      value={valiente.contexto_familiar?.factores_protectores || 'Sin registro'}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">Factores de Riesgo</label>
-                    <textarea
-                      className="w-full p-2 border rounded bg-red-50 border-red-100 text-sm mt-1"
-                      rows={2}
-                      readOnly
-                      value={valiente.contexto_familiar?.factores_riesgo || 'Sin registro'}
-                    />
-                  </div>
-                  <div>
                     <label className="text-xs font-bold text-slate-500">
                       Transformaciones Subjetivas
                     </label>
@@ -606,6 +580,24 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                       value={
                         valiente.programas?.[0]?.transformaciones_subjetivas || 'Sin registro'
                       }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">Motivación</label>
+                    <textarea
+                      className="w-full p-2 border rounded bg-emerald-50 border-emerald-100 text-sm mt-1"
+                      rows={2}
+                      readOnly
+                      value={valiente.programas?.[0]?.motivacion || 'Sin registro'}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">Compromisos</label>
+                    <textarea
+                      className="w-full p-2 border rounded bg-amber-50 border-amber-100 text-sm mt-1"
+                      rows={2}
+                      readOnly
+                      value={valiente.programas?.[0]?.compromisos || 'Sin registro'}
                     />
                   </div>
                 </div>
@@ -660,14 +652,21 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
               </h3>
               <div className="text-center p-4">
                 <div className="flex justify-center mb-2">
-                  <SorocaIcon className="text-emerald-600" size={40} />
+                  <img 
+                    src={getSorocaLogoPath(valiente.programas?.find(p => p.programa?.codigo === 'SOROCA')?.nivel)} 
+                    alt="Logo Soroca" 
+                    className="w-16 h-16 object-contain" 
+                  />
                 </div>
-                <div className="font-black text-lg text-emerald-800">
-                  {valiente.perfil_soroca?.macro || 'Sin macro'}
-                </div>
-                <div className="text-sm text-emerald-600">
-                  {valiente.perfil_soroca?.simbolo || 'Sin símbolo'}
-                </div>
+                {/* Mostrar tipo de programa SOROCA */}
+                {valiente.programas?.find(p => p.programa?.codigo === 'SOROCA')?.nivel && (
+                  <div className="mt-4 pt-4 border-t border-emerald-200">
+                    <div className="text-xs text-emerald-700 font-semibold mb-1">Tipo de Programa</div>
+                    <div className="text-sm font-bold text-emerald-900">
+                      {valiente.programas.find(p => p.programa?.codigo === 'SOROCA')?.nivel}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -678,9 +677,55 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
               <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2">
                 <Shield size={18} /> Elementos Tribu
               </h3>
-              <div className="space-y-2">
-                {/* No hay badges en la BD actual */}
-                <p className="text-sm text-indigo-400 italic">Iniciando camino.</p>
+              <div className="space-y-3">
+                {/* Mostrar disciplina */}
+                {valiente.perfil_deportivo?.disciplina && (
+                  <div className="bg-white p-3 rounded-lg border border-indigo-200">
+                    <div className="text-xs text-indigo-600 font-semibold mb-1">Disciplina</div>
+                    <div className="text-lg font-black text-indigo-900">
+                      {valiente.perfil_deportivo.disciplina}
+                    </div>
+                  </div>
+                )}
+
+                {/* Información deportiva */}
+                {valiente.perfil_deportivo && (
+                  <div className="bg-white p-3 rounded-lg border border-indigo-200">
+                    <div className="text-xs text-indigo-600 font-semibold mb-2">Información Deportiva</div>
+                    <div className="space-y-1 text-sm text-indigo-900">
+                      {valiente.perfil_deportivo.talla_guayos && (
+                        <div className="flex justify-between">
+                          <span className="text-indigo-600">Talla Guayos:</span>
+                          <span className="font-bold">{valiente.perfil_deportivo.talla_guayos}</span>
+                        </div>
+                      )}
+                      {valiente.perfil_deportivo.talla_camisa && (
+                        <div className="flex justify-between">
+                          <span className="text-indigo-600">Talla Camiseta:</span>
+                          <span className="font-bold">{valiente.perfil_deportivo.talla_camisa}</span>
+                        </div>
+                      )}
+                      {valiente.perfil_deportivo.talla_pantalon && (
+                        <div className="flex justify-between">
+                          <span className="text-indigo-600">Talla Pantalón:</span>
+                          <span className="font-bold">{valiente.perfil_deportivo.talla_pantalon}</span>
+                        </div>
+                      )}
+                      {valiente.perfil_deportivo.tiene_experiencia_previa && (
+                        <div className="mt-2 pt-2 border-t border-indigo-100">
+                          <span className="text-indigo-600">Experiencia previa:</span>
+                          <p className="text-xs text-indigo-800 mt-1">
+                            {valiente.perfil_deportivo.experiencia_previa || 'Sí'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {!valiente.perfil_deportivo && (
+                  <p className="text-sm text-indigo-400 italic">Iniciando camino.</p>
+                )}
               </div>
             </div>
           )}

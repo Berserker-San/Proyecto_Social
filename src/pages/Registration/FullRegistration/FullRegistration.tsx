@@ -46,7 +46,9 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     }).catch(console.error);
   }, []);
   const [formData, setFormData] = useState({
-    program: context, discipline: 'Ultimate',
+    program: context,
+    discipline: context === 'TRIBU' ? 'Ultimate' : '',
+    programType: context === 'SOROCA' ? 'Soñar' : '',
     docType: 'TI', docId: '',
     firstName: '', lastName: '', apodo: '',
     sex: '', genderIdentity: '',
@@ -58,17 +60,17 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     occupation: '', educationLevel: '', grade: '', schoolId: null as number | null, schoolName: '', schoolOther: '',
     favSubject: '', hardSubject: '', responsibilities: '', hobbies: '',
     workPlace: '', workDescription: '',
-    // Step 3 — Salud y Bienestar
+    // Step 3 - Salud y Bienestar
     epsId: null as number | null, epsOther: '',
     ipsId: null as number | null, ipsOther: '', bloodType: '',
     hasDisability: 'No', disabilityDetails: '',
     hasAllergy: 'No', allergyDetails: '',
     hasMedication: 'No', medicationDetails: '',
-    // Step 4 — Entorno Familiar y Socioeconómico
+    // Step 4 - Entorno Familiar y Socioeconómico
     familyComposition: '', familyCount: '', familyIncome: '',
     isConflictVictim: 'No', isRUV: 'No',
     ethnicity: '', ethnicityOther: '',
-    // Step 5 — Acudiente y Deporte
+    // Step 5 - Acudiente y Deporte
     guardianDocType: 'CC', guardianDocId: '',
     guardianFullName: '', guardianKinship: '', guardianPhone: '', guardianEmail: '',
     guardianWorks: 'No',
@@ -154,6 +156,8 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
 
   const stepIndex = STEPS.indexOf(step);
   const isFirst = stepIndex === 0;
+  const isTribu = formData.program === 'TRIBU';
+  const isSoroca = formData.program === 'SOROCA';
 
   // ── INTRO ──────────────────────────────────────────────
   if (step === 'intro') {
@@ -266,7 +270,7 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     residence:     { icon: <Home size={18} />,           label: 'Ubicación y Contexto',                color: 'full-section-title--blue'   },
     health:        { icon: <AlertCircle size={18} />,    label: 'Salud y Bienestar',                   color: 'full-section-title--red'    },
     socioeconomic: { icon: <CreditCard size={18} />,     label: 'Entorno Familiar y Socioeconómico',   color: 'full-section-title--amber'  },
-    guardian:      { icon: <HeartHandshake size={18} />, label: 'Acudiente y Deporte',                 color: 'full-section-title--slate'  },
+    guardian:      { icon: <HeartHandshake size={18} />, label: isTribu ? 'Acudiente y Deporte' : 'Acudiente', color: 'full-section-title--slate'  },
     documents:     { icon: null,                         label: '',                                    color: ''                           },
   };
 
@@ -288,19 +292,54 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
               <div className="form-grid-2">
                 <div>
                   <label className="form-label">PROGRAMA SER PARA SER</label>
-                  <select name="program" value={formData.program} onChange={handleChange} className="form-select">
+                  <select
+                    name="program"
+                    value={formData.program}
+                    onChange={e => {
+                      const nextProgram = e.target.value as 'TRIBU' | 'SOROCA';
+                      setFormData(prev => ({
+                        ...prev,
+                        program: nextProgram,
+                        discipline: nextProgram === 'TRIBU' ? (prev.discipline || 'Ultimate') : '',
+                        programType: nextProgram === 'SOROCA' ? (prev.programType || 'Soñar') : '',
+                        rugbyBackground: nextProgram === 'TRIBU' ? prev.rugbyBackground : 'No',
+                        shirtSize: nextProgram === 'TRIBU' ? prev.shirtSize : '',
+                        pantalonSize: nextProgram === 'TRIBU' ? prev.pantalonSize : '',
+                        shoeSize: nextProgram === 'TRIBU' ? prev.shoeSize : '',
+                        trainingDays: nextProgram === 'TRIBU' ? prev.trainingDays : [],
+                      }));
+                    }}
+                    className="form-select"
+                  >
                     <option value="TRIBU">TRIBU</option>
                     <option value="SOROCA">SOROCA</option>
                   </select>
                 </div>
-                <div>
-                  <label className="form-label">DISCIPLINA</label>
-                  <select name="discipline" value={formData.discipline} onChange={handleChange} className="form-select">
-                    <option value="Ultimate">Ultimate</option>
-                    <option value="Rugby">Rugby</option>
-                    <option value="N/A">N/A</option>
-                  </select>
-                </div>
+                {isTribu && (
+                  <div>
+                    <label className="form-label">DISCIPLINA</label>
+                    <select name="discipline" value={formData.discipline} onChange={handleChange} className="form-select">
+                      <option value="Ultimate">Ultimate</option>
+                      <option value="Rugby">Rugby</option>
+                    </select>
+                  </div>
+                )}
+                {isSoroca && (
+                  <div>
+                    <label className="form-label">TIPO DE PROGRAMA</label>
+                    <select
+                      name="programType"
+                      value={formData.programType}
+                      onChange={handleChange}
+                      className="form-select"
+                    >
+                      <option value="Soñar">Soñar</option>
+                      <option value="Cambiar">Cambiar</option>
+                      <option value="Romper">Romper</option>
+                      <option value="Mundo Cotidiano">Mundo Cotidiano</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="form-grid-2">
                 <div><label className="form-label">NOMBRES</label><input name="firstName" value={formData.firstName} onChange={handleChange} required className="form-input" /></div>
@@ -715,57 +754,59 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 </select>
               </div>
 
-              <p className="wizard-section-subtitle" style={{ marginTop: '1.25rem' }}>Perfil Deportivo</p>
-              <div className="form-group">
-                <label className="form-label">¿HA JUGADO ANTES?</label>
-                <select name="rugbyBackground" value={formData.rugbyBackground} onChange={handleChange} className="form-select">
-                  <option value="No">No (Principiante)</option>
-                  <option value="Si">Sí (Experiencia previa)</option>
-                </select>
-              </div>
-              <div className="form-grid-2">
-                <div>
-                  <label className="form-label">TALLA DE CAMISETA</label>
-                  <select name="shirtSize" value={formData.shirtSize} onChange={handleChange} className="form-select">
-                    <option value="">Seleccionar...</option>
-                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">TALLA DE PANTALÓN</label>
-                  <select name="pantalonSize" value={formData.pantalonSize} onChange={handleChange} className="form-select">
-                    <option value="">Seleccionar...</option>
-                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              {context === 'TRIBU' && (
-                <div>
-                  <label className="form-label">TALLA DE GUAYOS</label>
-                  <select name="shoeSize" value={formData.shoeSize} onChange={handleChange} className="form-select">
-                    <option value="">Seleccionar...</option>
-                    {['34','35','36','37','38','39','40','41','42','43','44','45'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
+              {isTribu && (
+                <>
+                  <p className="wizard-section-subtitle" style={{ marginTop: '1.25rem' }}>Perfil Deportivo</p>
+                  <div className="form-group">
+                    <label className="form-label">¿HA JUGADO ANTES?</label>
+                    <select name="rugbyBackground" value={formData.rugbyBackground} onChange={handleChange} className="form-select">
+                      <option value="No">No (Principiante)</option>
+                      <option value="Si">Sí (Experiencia previa)</option>
+                    </select>
+                  </div>
+                  <div className="form-grid-2">
+                    <div>
+                      <label className="form-label">TALLA DE CAMISETA</label>
+                      <select name="shirtSize" value={formData.shirtSize} onChange={handleChange} className="form-select">
+                        <option value="">Seleccionar...</option>
+                        {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">TALLA DE PANTALÓN</label>
+                      <select name="pantalonSize" value={formData.pantalonSize} onChange={handleChange} className="form-select">
+                        <option value="">Seleccionar...</option>
+                        {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">TALLA DE GUAYOS</label>
+                    <select name="shoeSize" value={formData.shoeSize} onChange={handleChange} className="form-select">
+                      <option value="">Seleccionar...</option>
+                      {['34','35','36','37','38','39','40','41','42','43','44','45'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COMPROMISO DE ENTRENOS</label>
+                    <div className="wizard-chips">
+                      {[
+                        'Lunes 4-6pm', 'Martes 4-6pm', 'Miércoles 4-6pm',
+                        'Viernes 4-6pm', 'Sábados 8-10am',
+                      ].map(day => (
+                        <button
+                          key={day}
+                          type="button"
+                          className={`wizard-chip${formData.trainingDays.includes(day) ? ' wizard-chip--active' : ''}`}
+                          onClick={() => toggleTrainingDay(day)}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
-              <div className="form-group">
-                <label className="form-label">COMPROMISO DE ENTRENOS</label>
-                <div className="wizard-chips">
-                  {[
-                    'Lunes 4-6pm', 'Martes 4-6pm', 'Miércoles 4-6pm',
-                    'Viernes 4-6pm', 'Sábados 8-10am',
-                  ].map(day => (
-                    <button
-                      key={day}
-                      type="button"
-                      className={`wizard-chip${formData.trainingDays.includes(day) ? ' wizard-chip--active' : ''}`}
-                      onClick={() => toggleTrainingDay(day)}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </>
           )}
         </div>
