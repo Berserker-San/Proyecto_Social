@@ -5,8 +5,10 @@ import RegistrationView from '../Registration/RegistrationView/RegistrationView'
 import CSVUploader from '../../components/CSVUploader/CSVUploader';
 import Statistics from '../Statistics/Statistics';
 import Attendance from '../Attendance/Attendance';
+import AdminUsers from '../Admin/AdminUsers';
 import ValienteProfileView from '../ValienteProfile/ValienteProfileView';
 import ValientesListView from '../ValienteProfile/ValientesListView';
+import ValienteEditView from '../ValienteProfile/ValienteEditView';
 import { getValientes } from '../../lib/services/valientes.service';
 import type { Valiente } from '../../types/database.types';
 import './Layout.css';
@@ -22,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
   const [activeView, setActiveView] = useState('welcome');
   const [appContext, setAppContext] = useState<AppContext>('GLOBAL');
   const [selectedValienteId, setSelectedValienteId] = useState<number | null>(null);
+  const [editingValienteId,  setEditingValienteId]  = useState<number | null>(null);
   const [allValientes, setAllValientes] = useState<Valiente[]>([]);
 
   const handleSelectProgram = (program: 'TRIBU' | 'SOROCA') => {
@@ -45,7 +48,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
 
   const handleSelectValiente = (id: number) => {
     setSelectedValienteId(id);
+    setEditingValienteId(null);
     setActiveView('valientes-directory');
+  };
+
+  const handleEditValiente = (id: number) => {
+    setEditingValienteId(id);
+    setActiveView('valientes-edit');
   };
 
   useEffect(() => {
@@ -66,6 +75,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
     if (activeView === 'csv-upload') return <CSVUploader onBack={() => setActiveView('welcome')} />;
     if (activeView === 'estadisticas') return <Statistics context={appContext} />;
     if (activeView === 'attendance')   return <Attendance usuarioId={usuarioId} context={appContext} />;
+    if (activeView === 'admin-users')  return <AdminUsers currentUsuarioId={usuarioId} />;
     if (activeView === 'directorio') {
       return (
         <ValientesListView
@@ -84,7 +94,19 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, usuarioId = null }) => {
             setSelectedValienteId(null);
             setActiveView('directorio');
           }}
+          onEdit={handleEditValiente}
           context={appContext}
+        />
+      );
+    }
+    if (activeView === 'valientes-edit' && editingValienteId !== null) {
+      return (
+        <ValienteEditView
+          valienteId={editingValienteId}
+          context={appContext}
+          onBack={() => {
+            setActiveView('valientes-directory');
+          }}
         />
       );
     }

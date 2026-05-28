@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, Shield, ArrowLeftRight, LogOut, BarChart2, Upload, ClipboardList, Users } from 'lucide-react';
+import { UserPlus, Shield, ArrowLeftRight, LogOut, BarChart2, Upload, ClipboardList, Users, UserCog } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../customIcons/customIcons';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
@@ -113,6 +113,22 @@ const Navbar: React.FC<NavbarProps> = ({
           >
             <Users size={18} />
             <span className="text-sm font-medium">Directorio</span>
+          </button>
+
+          {/* Separador */}
+          <div className="border-t border-white/10 my-1" />
+
+          {/* Administración */}
+          <button
+            onClick={() => onChangeView('admin-users')}
+            className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-300 ${
+              activeView === 'admin-users'
+                ? 'bg-white/10 border-white/20 text-white shadow-lg'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <UserCog size={18} />
+            <span className="text-sm font-medium">Usuarios</span>
           </button>
         </nav>
 

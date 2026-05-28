@@ -510,9 +510,9 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 <label className="form-label">OCUPACIÓN</label>
                 <select name="occupation" value={formData.occupation} onChange={handleChange} className="form-select">
                   <option value="">Seleccionar...</option>
-                  <option value="Estudio">Estudio</option>
-                  <option value="Trabajo">Trabajo</option>
-                  <option value="Estudio y trabajo">Estudio y trabajo</option>
+                  <option value="Estudia">Estudia</option>
+                  <option value="Trabaja">Trabaja</option>
+                  <option value="Estudia y trabaja">Estudia y trabaja</option>
                   <option value="Ninguna">Ninguna</option>
                 </select>
               </div>

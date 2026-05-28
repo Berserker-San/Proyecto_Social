@@ -103,6 +103,32 @@ export async function actualizarValiente(
 }
 
 /**
+ * Eliminar un valiente y todos sus datos relacionados
+ */
+export async function eliminarValiente(id: number): Promise<void> {
+  const tablas = [
+    'valiente_salud',
+    'valiente_ubicacion',
+    'valiente_educacion',
+    'valiente_contexto_familiar',
+    'valiente_perfil_deportivo',
+    'valiente_perfil_soroca',
+    'valiente_programa',
+    'valiente_acudiente',
+    'valiente_documento',
+    'asistencia'
+  ];
+
+  for (const tabla of tablas) {
+    const { error } = await supabase.from(tabla).delete().eq('valiente_id', id);
+    if (error && !error.message.includes('does not exist')) throw error;
+  }
+
+  const { error } = await supabase.from('valiente').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/**
  * Calcular edad de un valiente
  */
 export function calcularEdad(fechaNacimiento: string): number {

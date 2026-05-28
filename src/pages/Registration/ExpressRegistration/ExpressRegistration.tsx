@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { ArrowLeft, Save, User, AlertCircle, CreditCard, Dumbbell, Zap } from 'lucide-react';
 import { crearValiente } from '../../../lib/services/valientes.service';
 import { crearAcudiente, vincularAcudiente } from '../../../lib/services/acudientes.service';
-import { guardarPerfilDeportivo, guardarSalud } from '../../../lib/services/perfiles.service';
+import { guardarPerfilDeportivo, guardarSalud, guardarUbicacion, guardarEducacion, guardarContextoFamiliar } from '../../../lib/services/perfiles.service';
+import { supabase } from '../../../lib/supabase';
 import './ExpressRegistration.css';
 
 interface ExpressRegistrationProps {
@@ -108,6 +109,32 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
           talla_camisa: formData.shirtSize || null,
           talla_pantalon: formData.pantalonSize || null,
           horario_entrenamiento: null,
+        });
+      }
+
+      // 6. Crear registros vacíos en tablas restantes para que el perfil exista
+      await Promise.all([
+        guardarUbicacion({ valiente_id: valiente.id }),
+        guardarEducacion({ valiente_id: valiente.id }),
+        guardarContextoFamiliar({ valiente_id: valiente.id }),
+      ]);
+
+      // 7. Inscribir en programa TRIBU
+      const { data: programaTribu } = await supabase
+        .from('programa')
+        .select('id')
+        .eq('codigo', 'TRIBU')
+        .maybeSingle();
+
+      if (programaTribu) {
+        await supabase.from('valiente_programa').insert({
+          valiente_id: valiente.id,
+          programa_id: programaTribu.id,
+          es_principal: true,
+          fecha_ingreso: new Date().toISOString().split('T')[0],
+          estado: 'ACTIVO',
+          motivacion: formData.motivation || null,
+          nivel: formData.discipline || null,
         });
       }
 

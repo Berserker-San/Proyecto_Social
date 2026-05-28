@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronRight, Filter } from 'lucide-react';
+import { Search, ChevronRight, Filter, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { eliminarValiente } from '../../lib/services/valientes.service';
 import { getNombreCompleto } from '../../lib/utils/valienteHelpers';
 import type { ValienteListItem } from '../../lib/utils/valienteHelpers';
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
@@ -20,6 +21,7 @@ const ValientesListView: React.FC<ValientesListViewProps> = ({ onSelectValiente,
     context === 'TRIBU' ? 'TRIBU' : context === 'SOROCA' ? 'SOROCA' : 'ALL'
   );
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchValientes = async () => {
@@ -65,6 +67,21 @@ const ValientesListView: React.FC<ValientesListViewProps> = ({ onSelectValiente,
 
   const getProgramCodes = (v: ValienteListItem) =>
     v.programas?.map((p) => p.programa.codigo) ?? [];
+
+  const handleDelete = async (e: React.MouseEvent, id: number, nombre: string) => {
+    e.stopPropagation();
+    if (!confirm(`¿Eliminar a ${nombre} y todos sus datos? Esta acción no se puede deshacer.`)) return;
+    setDeletingId(id);
+    try {
+      await eliminarValiente(id);
+      setValientes(prev => prev.filter(v => v.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar el valiente.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto pb-10 px-4 pt-6">
@@ -215,9 +232,22 @@ const ValientesListView: React.FC<ValientesListViewProps> = ({ onSelectValiente,
                       </div>
                     </td>
 
-                    {/* Arrow column */}
+                    {/* Actions column */}
                     <td className="px-6 py-3 text-right">
-                      <ChevronRight size={16} className="text-slate-400 ml-auto" />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={(e) => handleDelete(e, v.id, getNombreCompleto(v))}
+                          disabled={deletingId === v.id}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                          title="Eliminar valiente"
+                        >
+                          {deletingId === v.id
+                            ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                            : <Trash2 size={15} />
+                          }
+                        </button>
+                        <ChevronRight size={16} className="text-slate-400" />
+                      </div>
                     </td>
                   </tr>
                 );

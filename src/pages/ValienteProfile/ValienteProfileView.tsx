@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   UserCheck, HeartPulse, GraduationCap, Home, Users, Zap, Shield, Activity,
-  Search, ChevronRight, MapPin, Leaf, FileText, Edit2, AlertCircle,
+  Search, ChevronRight, MapPin, Leaf, FileText, Edit2, AlertCircle, Pencil,
 } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
 import { getValienteById, calcularEdad } from '../../lib/services/valientes.service';
@@ -17,6 +17,7 @@ interface ValienteProfileViewProps {
   allValientes: Valiente[];
   onSelectValiente: (id: number) => void;
   onBack: () => void;
+  onEdit?: (valienteId: number) => void;
   context: 'GLOBAL' | 'TRIBU' | 'SOROCA';
 }
 
@@ -145,6 +146,7 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
   allValientes,
   onSelectValiente,
   onBack,
+  onEdit,
   context,
 }) => {
   const [valiente, setValiente] = useState<ValienteCompleto | null>(null);
@@ -387,6 +389,14 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 >
                   {valiente.estado}
                 </span>
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(valienteId)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 text-xs font-bold hover:bg-indigo-100 transition-colors"
+                  >
+                    <Pencil size={13} /> Editar perfil
+                  </button>
+                )}
               </div>
               <div className="text-sm text-slate-500 flex flex-wrap gap-x-4">
                 <span>
