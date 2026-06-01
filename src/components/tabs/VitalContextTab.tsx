@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart2, Loader2, MapPin, BookOpen, Briefcase } from 'lucide-react';
+import { BarChart2, Loader2, BookOpen, Briefcase, Users } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -7,17 +7,14 @@ import {
 import {
   getEstadisticasPorOcupacion,
   getEstadisticasPorEscolaridad,
-  getEstadisticasPorComuna,
   type EstadisticaOcupacion,
   type EstadisticaEscolaridad,
-  type EstadisticaComuna,
 } from '../../lib/services/estadisticas.service';
 
 // ── Paleta ────────────────────────────────────────────────────────────────
 
 const COLORS_PIE = ['#06b6d4', '#4f46e5', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 const COLOR_BAR  = '#06b6d4';
-const COLOR_BAR2 = '#4f46e5';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -86,34 +83,47 @@ const Empty = () => (
   </div>
 );
 
+// Separador de sección
+const SectionDivider: React.FC<{ label: string; icon: React.ReactNode }> = ({ label, icon }) => (
+  <div className="stats-chart-card--wide" style={{ gridColumn: '1 / -1' }}>
+    <div className="flex items-center gap-2 px-2 py-3 border-b border-slate-100">
+      <span className="text-slate-400">{icon}</span>
+      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+    </div>
+  </div>
+);
+
 // ── Componente ────────────────────────────────────────────────────────────
 
 const VitalContextTab: React.FC = () => {
   const [ocupacion,   setOcupacion]   = useState<EstadisticaOcupacion[]>([]);
   const [escolaridad, setEscolaridad] = useState<EstadisticaEscolaridad[]>([]);
-  const [comunas,     setComunas]     = useState<EstadisticaComuna[]>([]);
 
   const [loadingOcupacion,   setLoadingOcupacion]   = useState(true);
   const [loadingEscolaridad, setLoadingEscolaridad] = useState(true);
-  const [loadingComunas,     setLoadingComunas]     = useState(true);
 
   useEffect(() => {
     getEstadisticasPorOcupacion()
       .then(setOcupacion).catch(console.error).finally(() => setLoadingOcupacion(false));
     getEstadisticasPorEscolaridad()
       .then(setEscolaridad).catch(console.error).finally(() => setLoadingEscolaridad(false));
-    getEstadisticasPorComuna()
-      .then(setComunas).catch(console.error).finally(() => setLoadingComunas(false));
   }, []);
 
-  // Adaptar datos de ocupación para PieChart (nameKey debe ser "name")
   const ocupacionPie = ocupacion.map(o => ({ ...o, name: o.ocupacion }));
 
   return (
     <div className="stats-charts-grid">
 
-      {/* Ocupación — Torta */}
-      <ChartCard title="Ocupación" icon={<Briefcase size={14} />} loading={loadingOcupacion}>
+      {/* ── SECCIÓN VALIENTES ── */}
+      <div className="stats-chart-card--wide" style={{ gridColumn: '1 / -1', paddingBottom: 0 }}>
+        <div className="flex items-center gap-2 px-1 pb-2 border-b border-slate-100">
+          <Users size={14} className="text-indigo-400" />
+          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Valientes</span>
+        </div>
+      </div>
+
+      {/* Ocupación Valientes — Torta */}
+      <ChartCard title="Ocupación — Valientes" icon={<Briefcase size={14} />} loading={loadingOcupacion}>
         {ocupacion.length === 0 ? <Empty /> : (
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
@@ -142,8 +152,8 @@ const VitalContextTab: React.FC = () => {
         )}
       </ChartCard>
 
-      {/* Escolaridad — Barras */}
-      <ChartCard title="Nivel de Escolaridad" icon={<BookOpen size={14} />} loading={loadingEscolaridad}>
+      {/* Escolaridad Valientes — Barras */}
+      <ChartCard title="Escolaridad — Valientes" icon={<BookOpen size={14} />} loading={loadingEscolaridad}>
         {escolaridad.length === 0 ? <Empty /> : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={escolaridad} margin={{ top: 8, right: 12, left: -10, bottom: 40 }}>
@@ -163,19 +173,37 @@ const VitalContextTab: React.FC = () => {
         )}
       </ChartCard>
 
-      {/* Comunas — Barras wide */}
-      <ChartCard title="Concentración por Comunas" icon={<MapPin size={14} />} wide loading={loadingComunas}>
-        {comunas.length === 0 ? <Empty /> : (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={comunas} margin={{ top: 8, right: 24, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="comuna" tick={{ fontSize: 11, fill: '#64748b' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-              <Tooltip content={<CustomBarTooltip />} />
-              <Bar dataKey="total" fill={COLOR_BAR2} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+      {/* ── SECCIÓN ACUDIENTES / PADRES ── */}
+      <div className="stats-chart-card--wide" style={{ gridColumn: '1 / -1', paddingBottom: 0 }}>
+        <div className="flex items-center gap-2 px-1 pb-2 border-b border-slate-100 mt-2">
+          <Users size={14} className="text-emerald-500" />
+          <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+            Acudientes / Padres
+          </span>
+          <span className="text-xs text-slate-400 ml-2">
+            (datos de ocupación y escolaridad pendientes de captura en el formulario)
+          </span>
+        </div>
+      </div>
+
+      {/* Placeholder acudientes — ocupación */}
+      <ChartCard title="Ocupación — Acudientes" icon={<Briefcase size={14} />} loading={false}>
+        <div className="stats-chart-placeholder">
+          <Briefcase size={28} className="stats-chart-placeholder-icon" />
+          <span className="text-center text-xs text-slate-400 px-4">
+            Disponible cuando se registre la ocupación del acudiente en el formulario de registro.
+          </span>
+        </div>
+      </ChartCard>
+
+      {/* Placeholder acudientes — escolaridad */}
+      <ChartCard title="Escolaridad — Acudientes" icon={<BookOpen size={14} />} loading={false}>
+        <div className="stats-chart-placeholder">
+          <BookOpen size={28} className="stats-chart-placeholder-icon" />
+          <span className="text-center text-xs text-slate-400 px-4">
+            Disponible cuando se registre el nivel educativo del acudiente en el formulario de registro.
+          </span>
+        </div>
       </ChartCard>
 
     </div>

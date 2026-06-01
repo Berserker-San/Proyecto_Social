@@ -173,3 +173,41 @@ export async function getPerfilSoroca(valienteId: number) {
   if (error) throw error;
   return data as ValientePerfilSoroca | null;
 }
+
+// INSIGNIAS SOROCA
+export const INSIGNIAS_SOROCA = ['Ascua', 'Fuego', 'Tierra', 'Agua', 'Aire'] as const;
+export type InsigniaSoroca = typeof INSIGNIAS_SOROCA[number];
+
+/**
+ * Asigna una insignia (símbolo) al perfil SOROCA del valiente
+ * y registra el evento en historial_valiente.
+ */
+export async function asignarInsignia(
+  valienteId: number,
+  insignia: InsigniaSoroca,
+  fecha: string,
+  registradoPor: string | null
+): Promise<void> {
+  // 1. Actualizar símbolo en valiente_perfil_soroca (upsert por si no existe)
+  const { error: perfilError } = await supabase
+    .from('valiente_perfil_soroca')
+    .upsert({ valiente_id: valienteId, simbolo: insignia }, { onConflict: 'valiente_id' });
+
+  if (perfilError) throw perfilError;
+
+  // 2. Registrar en historial_valiente
+  const { error: historialError } = await supabase
+    .from('historial_valiente')
+    .insert({
+      valiente_id: valienteId,
+      tipo_evento: 'INSIGNIA',
+      categoria: 'SOROCA',
+      titulo: `Insignia asignada: ${insignia}`,
+      descripcion: `Se asignó la insignia "${insignia}" al valiente.`,
+      fecha_evento: fecha,
+      es_importante: true,
+      registrado_por: registradoPor,
+    });
+
+  if (historialError) throw historialError;
+}

@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Users, AlertTriangle, Briefcase, BarChart2, Heart, Brain, TrendingUp, Activity, Loader2 } from 'lucide-react';
+import { Globe, Users, AlertTriangle, Briefcase, BarChart2, Heart, Brain, TrendingUp, Activity, Loader2, Layers } from 'lucide-react';
 import { getResumenEstadisticas } from '../../lib/services/estadisticas.service';
 import DemographicsTab from '../../components/tabs/DemographicsTab';
 import VitalContextTab from '../../components/tabs/VitalContextTab';
 import HealthTab from '../../components/tabs/HealthTab';
 import FamilyContextTab from '../../components/tabs/FamilyContextTab';
 import SportsCultureTab from '../../components/tabs/SportsCultureTab';
+import CaracterizacionTab from '../../components/tabs/CaracterizacionTab';
 import './Statistics.css';
 
 type AppContext = 'GLOBAL' | 'TRIBU' | 'SOROCA';
 interface StatisticsProps { context?: AppContext; }
-type Tab = 'demografia' | 'contexto' | 'capital' | 'logistica' | 'nahual';
+type Tab = 'demografia' | 'contexto' | 'capital' | 'logistica' | 'nahual' | 'caracterizacion';
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
-  { key: 'demografia', label: 'Demografía',        icon: <Users size={14} />      },
-  { key: 'contexto',   label: 'Contexto Vital',    icon: <Globe size={14} />      },
-  { key: 'capital',    label: 'Entorno Familiar',   icon: <TrendingUp size={14} /> },
-  { key: 'logistica',  label: 'Logística y Salud', icon: <Activity size={14} />   },
-  { key: 'nahual',     label: 'Deporte y Cultura', icon: <Brain size={14} />      },
+  { key: 'demografia',      label: 'Demografía',           icon: <Users size={14} />      },
+  { key: 'contexto',        label: 'Educación y Ocupación', icon: <Brain size={14} />      },
+  { key: 'capital',         label: 'Entorno Familiar',      icon: <TrendingUp size={14} /> },
+  { key: 'logistica',       label: 'Logística y Salud',     icon: <Activity size={14} />   },
+  { key: 'nahual',          label: 'Deporte y Cultura',     icon: <BarChart2 size={14} />  },
+  { key: 'caracterizacion', label: 'Caracterización',       icon: <Layers size={14} />     },
 ];
 
 const Statistics: React.FC<StatisticsProps> = () => {
@@ -105,11 +107,12 @@ const Statistics: React.FC<StatisticsProps> = () => {
       </div>
 
       {/* TAB CONTENT */}
-      {activeTab === 'demografia' && <DemographicsTab />}
-      {activeTab === 'contexto'   && <VitalContextTab />}
-      {activeTab === 'capital'    && <FamilyContextTab />}
-      {activeTab === 'logistica'  && <HealthTab />}
-      {activeTab === 'nahual'     && <SportsCultureTab />}
+      {activeTab === 'demografia'      && <DemographicsTab />}
+      {activeTab === 'contexto'        && <VitalContextTab />}
+      {activeTab === 'capital'         && <FamilyContextTab />}
+      {activeTab === 'logistica'       && <HealthTab />}
+      {activeTab === 'nahual'          && <SportsCultureTab />}
+      {activeTab === 'caracterizacion' && <CaracterizacionTab />}
 
     </div>
   );

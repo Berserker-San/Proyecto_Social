@@ -9,10 +9,12 @@ import {
   getEstadisticasPorEdad,
   getEstadisticasPorEstrato,
   getEstadisticasPorPrograma,
+  getEstadisticasPorComuna,
   type EstadisticaPrograma,
   type EstadisticaGenero,
   type EstadisticaEstrato,
   type EstadisticaRangoEdad,
+  type EstadisticaComuna,
 } from '../../lib/services/estadisticas.service';
 
 // ── Paleta ────────────────────────────────────────────────────────────────
@@ -95,11 +97,13 @@ const DemographicsTab: React.FC = () => {
   const [edad,      setEdad]      = useState<EstadisticaRangoEdad[]>([]);
   const [estrato,   setEstrato]   = useState<EstadisticaEstrato[]>([]);
   const [programas, setProgramas] = useState<EstadisticaPrograma[]>([]);
+  const [comunas,   setComunas]   = useState<EstadisticaComuna[]>([]);
 
   const [loadingGenero,    setLoadingGenero]    = useState(true);
   const [loadingEdad,      setLoadingEdad]      = useState(true);
   const [loadingEstrato,   setLoadingEstrato]   = useState(true);
   const [loadingProgramas, setLoadingProgramas] = useState(true);
+  const [loadingComunas,   setLoadingComunas]   = useState(true);
 
   useEffect(() => {
     getEstadisticasPorGenero()
@@ -110,6 +114,8 @@ const DemographicsTab: React.FC = () => {
       .then(setEstrato).catch(console.error).finally(() => setLoadingEstrato(false));
     getEstadisticasPorPrograma()
       .then(setProgramas).catch(console.error).finally(() => setLoadingProgramas(false));
+    getEstadisticasPorComuna()
+      .then(setComunas).catch(console.error).finally(() => setLoadingComunas(false));
   }, []);
 
   return (
@@ -172,6 +178,21 @@ const DemographicsTab: React.FC = () => {
               <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
               <Tooltip content={<CustomBarTooltip />} />
               <Bar dataKey="total" fill={COLOR_BAR} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      {/* Comunas — wide */}
+      <ChartCard title="Concentración por Comunas" icon={<Map size={14} />} wide loading={loadingComunas}>
+        {comunas.length === 0 ? <Empty /> : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={comunas} margin={{ top: 8, right: 24, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="comuna" tick={{ fontSize: 11, fill: '#64748b' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+              <Tooltip content={<CustomBarTooltip />} />
+              <Bar dataKey="total" fill={COLOR_BAR_2} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

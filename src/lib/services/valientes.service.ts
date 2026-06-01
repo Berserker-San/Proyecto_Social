@@ -209,7 +209,8 @@ type OneToOneTable =
   | 'valiente_salud'
   | 'valiente_educacion'
   | 'valiente_contexto_familiar'
-  | 'valiente_perfil_deportivo';
+  | 'valiente_perfil_deportivo'
+  | 'valiente_perfil_soroca';
 
 async function saveByValienteId(
   table: OneToOneTable,
@@ -481,7 +482,7 @@ export async function registrarValienteCompleto(
   };
   await saveByValienteId('valiente_contexto_familiar', valienteId, contexto);
 
-  // -- 7. Perfil deportivo, solo TRIBU --------------------
+  // -- 7. Perfil deportivo (TRIBU) o perfil SOROCA (SOROCA) ----
   if (datos.program === 'TRIBU') {
     const perfilDeportivo = {
       valiente_id: valienteId,
@@ -495,6 +496,7 @@ export async function registrarValienteCompleto(
     };
     await saveByValienteId('valiente_perfil_deportivo', valienteId, perfilDeportivo);
   } else {
+    // SOROCA: limpiar perfil deportivo si existía y guardar el tipo de programa en macro
     const { error: deletePerfilError } = await supabase
       .from('valiente_perfil_deportivo')
       .delete()
@@ -502,6 +504,18 @@ export async function registrarValienteCompleto(
 
     if (deletePerfilError) {
       throw new Error(`No se pudo limpiar el perfil deportivo: ${deletePerfilError.message}`);
+    }
+
+    // Guardar el tipo de programa SOROCA (Soñar, Romper, Cambiar, Mundo Cotidiano) en macro
+    if (datos.programType) {
+      await saveByValienteId('valiente_perfil_soroca', valienteId, {
+        valiente_id: valienteId,
+        macro: cleanText(datos.programType),
+        simbolo: null,
+        intereses_artisticos: null,
+        habilidades: null,
+        proyectos_personales: null,
+      });
     }
   }
 

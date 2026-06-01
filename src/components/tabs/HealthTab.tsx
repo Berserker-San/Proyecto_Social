@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart2, Loader2, Accessibility, Leaf, Pill } from 'lucide-react';
+import { BarChart2, Loader2, Accessibility, Leaf, Pill, FileCheck } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
   getEstadisticasSalud,
+  getEstadisticasEpsCertificado,
   type EstadisticaSaludItem,
+  type EstadisticaEpsCertificado,
 } from '../../lib/services/estadisticas.service';
 
 // ── Paleta ────────────────────────────────────────────────────────────────
 
-const COLORS_SI_NO = ['#ef4444', '#e2e8f0'];
+const COLORS_SI_NO  = ['#ef4444', '#e2e8f0'];
+const COLORS_EPS    = ['#10b981', '#f59e0b'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -101,7 +104,9 @@ const HealthTab: React.FC = () => {
   const [discapacidad, setDiscapacidad] = useState<EstadisticaSaludItem[]>([]);
   const [alergia,      setAlergia]      = useState<EstadisticaSaludItem[]>([]);
   const [tratamiento,  setTratamiento]  = useState<EstadisticaSaludItem[]>([]);
+  const [epsCert,      setEpsCert]      = useState<EstadisticaEpsCertificado[]>([]);
   const [loading,      setLoading]      = useState(true);
+  const [loadingEps,   setLoadingEps]   = useState(true);
 
   useEffect(() => {
     getEstadisticasSalud()
@@ -112,7 +117,55 @@ const HealthTab: React.FC = () => {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    getEstadisticasEpsCertificado()
+      .then(setEpsCert)
+      .catch(console.error)
+      .finally(() => setLoadingEps(false));
   }, []);
+
+  // Torta EPS con colores distintos
+  const EpsPie: React.FC = () => {
+    if (!epsCert.length) return <Empty />;
+    const pieData = epsCert.map(d => ({ ...d, name: d.categoria }));
+    return (
+      <ResponsiveContainer width="100%" height={260}>
+        <PieChart>
+          <Pie
+            data={pieData}
+            dataKey="total"
+            nameKey="name"
+            cx="50%"
+            cy="44%"
+            outerRadius={90}
+            labelLine={false}
+            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, payload }: any) => {
+              if (percent < 0.05) return null;
+              const RADIAN = Math.PI / 180;
+              const r = innerRadius + (outerRadius - innerRadius) * 0.55;
+              const lx = cx + r * Math.cos(-midAngle * RADIAN);
+              const ly = cy + r * Math.sin(-midAngle * RADIAN);
+              return (
+                <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central" className="stats-pie-label-pct">
+                  {payload.porcentaje}%
+                </text>
+              );
+            }}
+          >
+            {pieData.map((_, i) => (
+              <Cell key={i} fill={COLORS_EPS[i % COLORS_EPS.length]} />
+            ))}
+          </Pie>
+          <Tooltip content={<CustomPieTooltip />} />
+          <Legend
+            verticalAlign="bottom"
+            height={32}
+            formatter={(v) => <span className="stats-legend-text">{v}</span>}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  };
 
   return (
     <div className="stats-charts-grid">
@@ -127,6 +180,10 @@ const HealthTab: React.FC = () => {
 
       <ChartCard title="Tratamiento Médico" icon={<Pill size={14} />} loading={loading}>
         <SiNoPie data={tratamiento} />
+      </ChartCard>
+
+      <ChartCard title="Certificado EPS Cargado" icon={<FileCheck size={14} />} loading={loadingEps}>
+        <EpsPie />
       </ChartCard>
 
     </div>

@@ -635,3 +635,167 @@ export async function getEstadisticasEntrenos(): Promise<EstadisticaEntreno[]> {
       return a.dia.localeCompare(b.dia);
     });
 }
+
+// =========================================================
+// ESTADÍSTICAS EPS — Certificado cargado o no
+// =========================================================
+
+export interface EstadisticaEpsCertificado {
+  categoria: string;   // "Con certificado" | "Sin certificado"
+  total: number;
+  porcentaje: number;
+}
+
+export async function getEstadisticasEpsCertificado(): Promise<EstadisticaEpsCertificado[]> {
+  // Traer todos los valientes activos
+  const { data: valientes, error: vErr } = await supabase
+    .from('valiente')
+    .select('id')
+    .eq('estado', 'ACTIVO');
+
+  if (vErr) throw vErr;
+
+  const ids = (valientes ?? []).map(v => v.id);
+  if (ids.length === 0) return [];
+
+  // Traer los que tienen documento de tipo 'eps'
+  const { data: docs, error: dErr } = await supabase
+    .from('valiente_documento')
+    .select('valiente_id')
+    .eq('tipo_documento', 'eps')
+    .in('valiente_id', ids);
+
+  if (dErr) throw dErr;
+
+  const conCert = new Set((docs ?? []).map(d => d.valiente_id)).size;
+  const sinCert = ids.length - conCert;
+  const total   = ids.length;
+
+  return [
+    { categoria: 'Con certificado', total: conCert, porcentaje: total > 0 ? Math.round((conCert / total) * 1000) / 10 : 0 },
+    { categoria: 'Sin certificado', total: sinCert, porcentaje: total > 0 ? Math.round((sinCert / total) * 1000) / 10 : 0 },
+  ];
+}
+
+// =========================================================
+// ESTADÍSTICAS CARACTERIZACIÓN — Tribu vs Soroca y sub-tipos
+// =========================================================
+
+export interface EstadisticaCaracterizacion {
+  categoria: string;
+  total: number;
+  porcentaje: number;
+}
+
+/** Distribución TRIBU vs SOROCA */
+export async function getEstadisticasPorTipoPrograma(): Promise<EstadisticaCaracterizacion[]> {
+  const { data, error } = await supabase
+    .from('valiente_programa')
+    .select(`
+      programa ( codigo ),
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO')
+    .eq('estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const codigo = (row.programa as any)?.codigo ?? 'Sin programa';
+    conteo[codigo] = (conteo[codigo] ?? 0) + 1;
+  }
+
+  const total = Object.values(conteo).reduce((s, n) => s + n, 0);
+  return Object.entries(conteo)
+    .map(([categoria, t]) => ({
+      categoria,
+      total: t,
+      porcentaje: total > 0 ? Math.round((t / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/** Distribución disciplina TRIBU: Ultimate vs Rugby */
+export async function getEstadisticasDisciplinaTribu(): Promise<EstadisticaCaracterizacion[]> {
+  const { data, error } = await supabase
+    .from('valiente_perfil_deportivo')
+    .select(`
+      disciplina,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const key = row.disciplina ?? 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  const total = Object.values(conteo).reduce((s, n) => s + n, 0);
+  return Object.entries(conteo)
+    .map(([categoria, t]) => ({
+      categoria,
+      total: t,
+      porcentaje: total > 0 ? Math.round((t / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/** Distribución macro SOROCA: Soñar, Romper, Cambiar, Mundo Cotidiano */
+export async function getEstadisticasMacroSoroca(): Promise<EstadisticaCaracterizacion[]> {
+  const { data, error } = await supabase
+    .from('valiente_perfil_soroca')
+    .select(`
+      macro,
+      valiente!inner ( estado )
+    `)
+    .eq('valiente.estado', 'ACTIVO');
+
+  if (error) throw error;
+
+  const conteo: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const key = row.macro ?? 'No registrado';
+    conteo[key] = (conteo[key] ?? 0) + 1;
+  }
+
+  const ORDER = ['Soñar', 'Romper', 'Cambiar', 'Mundo Cotidiano'];
+  const total = Object.values(conteo).reduce((s, n) => s + n, 0);
+
+  return Object.entries(conteo)
+    .map(([categoria, t]) => ({
+      categoria,
+      total: t,
+      porcentaje: total > 0 ? Math.round((t / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a.categoria), ib = ORDER.indexOf(b.categoria);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.categoria.localeCompare(b.categoria);
+    });
+}
+
+// =========================================================
+// ESTADÍSTICAS EDUCACIÓN Y OCUPACIÓN — Valientes vs Acudientes
+// =========================================================
+
+export interface EstadisticaOcupacionAcudiente {
+  ocupacion: string;
+  total: number;
+  porcentaje: number;
+}
+
+/** Ocupación de acudientes (trabaja_actualmente en valiente_acudiente no existe,
+ *  usamos la tabla acudiente — campo no disponible directamente.
+ *  Por ahora retorna datos de valiente.trabaja_estudia para acudientes
+ *  cuando se implemente la tabla. Placeholder para futura extensión. */
+export async function getEstadisticasOcupacionAcudientes(): Promise<EstadisticaOcupacionAcudiente[]> {
+  // La tabla acudiente no tiene campo de ocupación en el esquema actual.
+  // Esta función retorna vacío hasta que se agregue el campo.
+  return [];
+}

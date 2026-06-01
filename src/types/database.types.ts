@@ -341,6 +341,29 @@ export interface Asistencia {
 }
 
 // =========================================================
+// ACOMPAÑAMIENTO (NAHUAL)
+// =========================================================
+
+export interface Acompanamiento {
+  id: number;
+  valiente_id: number;
+  nahual_id: string;           // uuid → usuario_sistema
+  fecha: string;               // date ISO
+  lugar: string | null;
+  motivo_tema: string | null;
+  nota: string | null;
+  compromisos_acuerdos: string | null;
+  fecha_proximo_encuentro: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/** Acompañamiento con datos del Nahual incluidos (para mostrar en el perfil) */
+export interface AcompanamientoConNahual extends Acompanamiento {
+  nahual?: { nombre: string; email: string } | null;
+}
+
+// =========================================================
 // TIPOS COMPUESTOS
 // =========================================================
 

@@ -1,12 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   UserCheck, HeartPulse, GraduationCap, Home, Users, Zap, Shield, Activity,
-  Search, ChevronRight, MapPin, Leaf, FileText, Edit2, AlertCircle, Pencil,
+  Search, ChevronRight, MapPin, Leaf, FileText, AlertCircle, Pencil,
+  Plus, Trash2, ChevronDown, ChevronUp, Calendar, Save, X,
+  Download, Eye, Flame, Wind, Droplets, Mountain, Sparkles,
 } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
 import { getValienteById, calcularEdad } from '../../lib/services/valientes.service';
+import {
+  getAcompanamientosByValiente,
+  crearAcompanamiento,
+  eliminarAcompanamiento,
+} from '../../lib/services/acompanamiento.service';
+import {
+  asignarInsignia,
+  INSIGNIAS_SOROCA,
+  type InsigniaSoroca,
+} from '../../lib/services/perfiles.service';
+import {
+  getDocumentosValiente,
+  getUrlDescarga,
+  TIPO_DOC_LABEL,
+} from '../../lib/services/documentos.service';
 import { getNombreCompleto } from '../../lib/utils/valienteHelpers';
-import type { Valiente, ValienteCompleto } from '../../types/database.types';
+import { useAuth } from '../../lib/hooks/useAuth';
+import type { Valiente, ValienteCompleto, AcompanamientoConNahual, ValienteDocumento } from '../../types/database.types';
 
 // =========================================================
 // PROPS
@@ -137,6 +155,15 @@ const AvatarFallback = ({ nombre, size = 'lg' }: { nombre: string; size?: 'sm' |
   );
 };
 
+// Configuración visual de cada insignia SOROCA
+const INSIGNIA_CONFIG: Record<string, { color: string; bg: string; border: string; icon: React.ReactNode }> = {
+  Ascua:  { color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-300', icon: <Sparkles size={22} className="text-orange-500" /> },
+  Fuego:  { color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-300',    icon: <Flame    size={22} className="text-red-500"    /> },
+  Tierra: { color: 'text-amber-800',  bg: 'bg-amber-50',   border: 'border-amber-300',  icon: <Mountain size={22} className="text-amber-600"  /> },
+  Agua:   { color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-300',   icon: <Droplets size={22} className="text-blue-500"   /> },
+  Aire:   { color: 'text-sky-700',    bg: 'bg-sky-50',     border: 'border-sky-300',    icon: <Wind     size={22} className="text-sky-500"    /> },
+};
+
 // =========================================================
 // COMPONENTE PRINCIPAL
 // =========================================================
@@ -156,6 +183,34 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Estado para acompañamientos
+  const [acompanamientos, setAcompanamientos] = useState<AcompanamientoConNahual[]>([]);
+  const [loadingAcomp, setLoadingAcomp] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [savingAcomp, setSavingAcomp] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [formAcomp, setFormAcomp] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    lugar: '',
+    motivo_tema: '',
+    nota: '',
+    compromisos_acuerdos: '',
+    fecha_proximo_encuentro: '',
+  });
+
+  const { usuarioSistema } = useAuth();
+
+  // Estado para insignias SOROCA
+  const [insigniaSeleccionada, setInsigniaSeleccionada] = useState<InsigniaSoroca | ''>('');
+  const [fechaInsignia, setFechaInsignia] = useState(new Date().toISOString().split('T')[0]);
+  const [savingInsignia, setSavingInsignia] = useState(false);
+  const [insigniaActual, setInsigniaActual] = useState<string | null>(null);
+
+  // Estado para documentos
+  const [documentos, setDocumentos] = useState<ValienteDocumento[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [descargando, setDescargando] = useState<number | null>(null);
 
   // Cargar datos al montar o cuando cambia valienteId
   useEffect(() => {
@@ -193,6 +248,95 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Cargar acompañamientos al abrir el tab Nahual
+  useEffect(() => {
+    if (activeTab !== 'nahual' || !valienteId) return;
+    setLoadingAcomp(true);
+    getAcompanamientosByValiente(valienteId)
+      .then(setAcompanamientos)
+      .catch(console.error)
+      .finally(() => setLoadingAcomp(false));
+  }, [activeTab, valienteId]);
+
+  const handleSaveAcomp = async () => {
+    if (!usuarioSistema?.id) return;
+    setSavingAcomp(true);
+    try {
+      const nuevo = await crearAcompanamiento({
+        valiente_id: valienteId,
+        nahual_id: usuarioSistema.id,
+        fecha: formAcomp.fecha,
+        lugar: formAcomp.lugar || null,
+        motivo_tema: formAcomp.motivo_tema || null,
+        nota: formAcomp.nota || null,
+        compromisos_acuerdos: formAcomp.compromisos_acuerdos || null,
+        fecha_proximo_encuentro: formAcomp.fecha_proximo_encuentro || null,
+      });
+      setAcompanamientos(prev => [{ ...nuevo, nahual: { nombre: usuarioSistema.nombre, email: usuarioSistema.email } }, ...prev]);
+      setShowForm(false);
+      setFormAcomp({ fecha: new Date().toISOString().split('T')[0], lugar: '', motivo_tema: '', nota: '', compromisos_acuerdos: '', fecha_proximo_encuentro: '' });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingAcomp(false);
+    }
+  };
+
+  const handleDeleteAcomp = async (id: number) => {
+    if (!confirm('¿Eliminar este acompañamiento?')) return;
+    await eliminarAcompanamiento(id);
+    setAcompanamientos(prev => prev.filter(a => a.id !== id));
+  };
+
+  // Sincronizar insignia actual cuando carga el valiente
+  useEffect(() => {
+    if (valiente?.perfil_soroca?.simbolo) {
+      setInsigniaActual(valiente.perfil_soroca.simbolo);
+    }
+  }, [valiente]);
+
+  // Cargar documentos al abrir el tab Red Apoyo (donde los mostraremos)
+  useEffect(() => {
+    if (activeTab !== 'family' || !valienteId) return;
+    setLoadingDocs(true);
+    getDocumentosValiente(valienteId)
+      .then(setDocumentos)
+      .catch(console.error)
+      .finally(() => setLoadingDocs(false));
+  }, [activeTab, valienteId]);
+
+  const handleAsignarInsignia = async () => {
+    if (!insigniaSeleccionada || !fechaInsignia) return;
+    setSavingInsignia(true);
+    try {
+      await asignarInsignia(
+        valienteId,
+        insigniaSeleccionada,
+        fechaInsignia,
+        usuarioSistema?.id ?? null
+      );
+      setInsigniaActual(insigniaSeleccionada);
+      setInsigniaSeleccionada('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingInsignia(false);
+    }
+  };
+
+  const handleDescargar = async (doc: ValienteDocumento) => {
+    if (!doc.url_archivo) return;
+    setDescargando(doc.id);
+    try {
+      const url = await getUrlDescarga(doc.url_archivo);
+      window.open(url, '_blank');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDescargando(null);
+    }
+  };
 
   // Buscador de navegación rápida
   const filteredValientes =
@@ -531,16 +675,76 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
 
           {/* TAB: RED APOYO */}
           {activeTab === 'family' && (
-            <Section title="Acudiente Principal">
-              <GridItem label="Nombre" value={acudientePrincipal?.nombre_completo} />
-              <GridItem label="Celular" value={acudientePrincipal?.celular} />
-              <GridItem label="Parentesco" value={valiente.acudientes?.[0]?.parentesco} />
-              <GridItem label="Email" value={acudientePrincipal?.email} />
-              <GridItem
-                label="Autorización Firmada"
-                value={acudientePrincipal?.tiene_autorizacion_firmada ? 'Sí' : 'No'}
-              />
-            </Section>
+            <div className="space-y-6">
+              <Section title="Acudiente Principal">
+                <GridItem label="Nombre" value={acudientePrincipal?.nombre_completo} />
+                <GridItem label="Celular" value={acudientePrincipal?.celular} />
+                <GridItem label="Parentesco" value={valiente.acudientes?.[0]?.parentesco} />
+                <GridItem label="Email" value={acudientePrincipal?.email} />
+                <GridItem
+                  label="Autorización Firmada"
+                  value={acudientePrincipal?.tiene_autorizacion_firmada ? 'Sí' : 'No'}
+                />
+              </Section>
+
+              {/* Documentos adjuntos */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-50 pb-2">
+                  Documentos Adjuntos
+                </h3>
+
+                {loadingDocs ? (
+                  <div className="flex justify-center py-6">
+                    <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-slate-400" />
+                  </div>
+                ) : documentos.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic text-center py-4">
+                    No hay documentos cargados para este valiente.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {documentos.map(doc => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText size={18} className="text-slate-400 shrink-0" />
+                          <div>
+                            <div className="text-sm font-semibold text-slate-700">
+                              {TIPO_DOC_LABEL[doc.tipo_documento] ?? doc.tipo_documento}
+                            </div>
+                            {doc.nombre_archivo && (
+                              <div className="text-xs text-slate-400 truncate max-w-xs">
+                                {doc.nombre_archivo}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {doc.esta_verificado && (
+                            <span className="text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-0.5 rounded">
+                              Verificado
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleDescargar(doc)}
+                            disabled={descargando === doc.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                          >
+                            {descargando === doc.id
+                              ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              : <Download size={13} />
+                            }
+                            {descargando === doc.id ? 'Abriendo...' : 'Ver / Descargar'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {/* TAB: EL SER */}
@@ -550,25 +754,87 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 <GridItem label="Hobbies" value={valiente.hobbies} full />
                 <GridItem label="Trabaja/Estudia" value={valiente.trabaja_estudia} />
               </Section>
+
+              {/* Insignias SOROCA */}
+              {isSoroca && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-50 pb-2">
+                    Insignia SOROCA
+                  </h3>
+
+                  {/* Insignia actual */}
+                  {insigniaActual && INSIGNIA_CONFIG[insigniaActual] && (
+                    <div className={`flex items-center gap-3 p-4 rounded-xl border-2 mb-5 ${INSIGNIA_CONFIG[insigniaActual].bg} ${INSIGNIA_CONFIG[insigniaActual].border}`}>
+                      {INSIGNIA_CONFIG[insigniaActual].icon}
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500 uppercase">Insignia actual</div>
+                        <div className={`text-lg font-black ${INSIGNIA_CONFIG[insigniaActual].color}`}>
+                          {insigniaActual}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Selector de insignia */}
+                  <div className="space-y-3">
+                    <div className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                      {insigniaActual ? 'Cambiar insignia' : 'Asignar insignia'}
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {INSIGNIAS_SOROCA.map(ins => {
+                        const cfg = INSIGNIA_CONFIG[ins];
+                        const selected = insigniaSeleccionada === ins;
+                        return (
+                          <button
+                            key={ins}
+                            onClick={() => setInsigniaSeleccionada(selected ? '' : ins)}
+                            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-bold
+                              ${selected
+                                ? `${cfg.bg} ${cfg.border} ${cfg.color} shadow-md scale-105`
+                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                              }`}
+                          >
+                            {cfg.icon}
+                            {ins}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {insigniaSeleccionada && (
+                      <div className="flex items-end gap-3 mt-3">
+                        <div className="flex-1">
+                          <label className="text-xs font-semibold text-slate-500 block mb-1">
+                            Fecha de asignación
+                          </label>
+                          <input
+                            type="date"
+                            value={fechaInsignia}
+                            onChange={e => setFechaInsignia(e.target.value)}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm"
+                          />
+                        </div>
+                        <button
+                          onClick={handleAsignarInsignia}
+                          disabled={savingInsignia}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                        >
+                          <Save size={14} />
+                          {savingInsignia ? 'Guardando...' : 'Confirmar'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {valiente.perfil_soroca && (
                 <Section title="Perfil Soroca">
                   <GridItem label="Macro" value={valiente.perfil_soroca.macro} />
                   <GridItem label="Símbolo" value={valiente.perfil_soroca.simbolo} />
-                  <GridItem
-                    label="Intereses Artísticos"
-                    value={valiente.perfil_soroca.intereses_artisticos}
-                    full
-                  />
-                  <GridItem
-                    label="Habilidades"
-                    value={valiente.perfil_soroca.habilidades}
-                    full
-                  />
-                  <GridItem
-                    label="Proyectos Personales"
-                    value={valiente.perfil_soroca.proyectos_personales}
-                    full
-                  />
+                  <GridItem label="Intereses Artísticos" value={valiente.perfil_soroca.intereses_artisticos} full />
+                  <GridItem label="Habilidades" value={valiente.perfil_soroca.habilidades} full />
+                  <GridItem label="Proyectos Personales" value={valiente.perfil_soroca.proyectos_personales} full />
                 </Section>
               )}
             </div>
@@ -576,47 +842,234 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
 
           {/* TAB: NAHUAL */}
           {activeTab === 'nahual' && (
-            <div className="space-y-6">
-              <Section title="Dossier Psicosocial">
-                <div className="col-span-2 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      Transformaciones Subjetivas
-                    </label>
-                    <textarea
-                      className="w-full p-2 border rounded bg-indigo-50 border-indigo-100 text-sm mt-1"
-                      rows={3}
-                      readOnly
-                      value={
-                        valiente.programas?.[0]?.transformaciones_subjetivas || 'Sin registro'
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">Motivación</label>
-                    <textarea
-                      className="w-full p-2 border rounded bg-emerald-50 border-emerald-100 text-sm mt-1"
-                      rows={2}
-                      readOnly
-                      value={valiente.programas?.[0]?.motivacion || 'Sin registro'}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">Compromisos</label>
-                    <textarea
-                      className="w-full p-2 border rounded bg-amber-50 border-amber-100 text-sm mt-1"
-                      rows={2}
-                      readOnly
-                      value={valiente.programas?.[0]?.compromisos || 'Sin registro'}
-                    />
-                  </div>
-                </div>
-              </Section>
-              <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-center">
-                <button className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
-                  <Edit2 size={16} /> Gestionar Acompañamiento
+            <div className="space-y-4">
+
+              {/* Cabecera con botón nuevo acompañamiento */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                  Acompañamientos
+                </h3>
+                <button
+                  onClick={() => setShowForm(v => !v)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors"
+                >
+                  {showForm ? <X size={14} /> : <Plus size={14} />}
+                  {showForm ? 'Cancelar' : 'Nuevo acompañamiento'}
                 </button>
               </div>
+
+              {/* Formulario nuevo acompañamiento */}
+              {showForm && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
+                    <Shield size={15} /> Registrar acompañamiento
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">
+                        Fecha de la sesión *
+                      </label>
+                      <input
+                        type="date"
+                        value={formAcomp.fecha}
+                        onChange={e => setFormAcomp(p => ({ ...p, fecha: e.target.value }))}
+                        className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">
+                        Lugar
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. TRIBU, SOROCA, Parque..."
+                        value={formAcomp.lugar}
+                        onChange={e => setFormAcomp(p => ({ ...p, lugar: e.target.value }))}
+                        className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">
+                      Motivo / Tema del acompañamiento
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Seguimiento escolar, crisis familiar..."
+                      value={formAcomp.motivo_tema}
+                      onChange={e => setFormAcomp(p => ({ ...p, motivo_tema: e.target.value }))}
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">
+                      Nota del Nahual
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Descripción narrativa de la sesión..."
+                      value={formAcomp.nota}
+                      onChange={e => setFormAcomp(p => ({ ...p, nota: e.target.value }))}
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">
+                      Compromisos, acuerdos y tareas
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Acuerdos pactados con el valiente..."
+                      value={formAcomp.compromisos_acuerdos}
+                      onChange={e => setFormAcomp(p => ({ ...p, compromisos_acuerdos: e.target.value }))}
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white resize-none"
+                    />
+                  </div>
+
+                  <div className="md:w-1/2">
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">
+                      Fecha próximo encuentro
+                    </label>
+                    <input
+                      type="date"
+                      value={formAcomp.fecha_proximo_encuentro}
+                      onChange={e => setFormAcomp(p => ({ ...p, fecha_proximo_encuentro: e.target.value }))}
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveAcomp}
+                      disabled={savingAcomp || !formAcomp.fecha}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Save size={15} />
+                      {savingAcomp ? 'Guardando...' : 'Guardar acompañamiento'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de acompañamientos */}
+              {loadingAcomp ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+                </div>
+              ) : acompanamientos.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center">
+                  <Shield className="mx-auto text-slate-300 mb-3" size={36} />
+                  <p className="text-sm text-slate-400 italic">
+                    No hay acompañamientos registrados para este valiente.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {acompanamientos.map(a => (
+                    <div
+                      key={a.id}
+                      className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
+                    >
+                      {/* Cabecera del card */}
+                      <button
+                        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
+                        onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
+                      >
+                        <div className="flex items-center gap-3 text-left">
+                          <Calendar size={15} className="text-indigo-400 shrink-0" />
+                          <div>
+                            <span className="text-sm font-bold text-slate-800">
+                              {new Date(a.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+                                day: '2-digit', month: 'long', year: 'numeric',
+                              })}
+                            </span>
+                            {a.lugar && (
+                              <span className="ml-2 text-xs text-slate-400">· {a.lugar}</span>
+                            )}
+                            {a.motivo_tema && (
+                              <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">
+                                {a.motivo_tema}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {a.nahual?.nombre && (
+                            <span className="text-xs text-indigo-600 font-semibold hidden sm:block">
+                              {a.nahual.nombre}
+                            </span>
+                          )}
+                          {expandedId === a.id
+                            ? <ChevronUp size={16} className="text-slate-400" />
+                            : <ChevronDown size={16} className="text-slate-400" />
+                          }
+                        </div>
+                      </button>
+
+                      {/* Detalle expandido */}
+                      {expandedId === a.id && (
+                        <div className="px-5 pb-5 pt-1 border-t border-slate-50 space-y-3">
+
+                          {a.nahual?.nombre && (
+                            <div>
+                              <span className="text-xs font-semibold text-slate-400 uppercase">Nahual</span>
+                              <p className="text-sm text-slate-700 font-medium">{a.nahual.nombre}</p>
+                            </div>
+                          )}
+
+                          {a.motivo_tema && (
+                            <div>
+                              <span className="text-xs font-semibold text-slate-400 uppercase">Motivo / Tema</span>
+                              <p className="text-sm text-slate-700">{a.motivo_tema}</p>
+                            </div>
+                          )}
+
+                          {a.nota && (
+                            <div>
+                              <span className="text-xs font-semibold text-slate-400 uppercase">Nota del Nahual</span>
+                              <p className="text-sm text-slate-700 whitespace-pre-wrap bg-indigo-50 rounded-lg p-3 mt-1">
+                                {a.nota}
+                              </p>
+                            </div>
+                          )}
+
+                          {a.compromisos_acuerdos && (
+                            <div>
+                              <span className="text-xs font-semibold text-slate-400 uppercase">Compromisos y acuerdos</span>
+                              <p className="text-sm text-slate-700 whitespace-pre-wrap bg-amber-50 rounded-lg p-3 mt-1">
+                                {a.compromisos_acuerdos}
+                              </p>
+                            </div>
+                          )}
+
+                          {a.fecha_proximo_encuentro && (
+                            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+                              <Calendar size={14} />
+                              <span className="font-semibold">Próximo encuentro:</span>
+                              {new Date(a.fecha_proximo_encuentro + 'T12:00:00').toLocaleDateString('es-CO', {
+                                day: '2-digit', month: 'long', year: 'numeric',
+                              })}
+                            </div>
+                          )}
+
+                          <div className="flex justify-end pt-1">
+                            <button
+                              onClick={() => handleDeleteAcomp(a.id)}
+                              className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-semibold"
+                            >
+                              <Trash2 size={13} /> Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
