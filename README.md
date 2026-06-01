@@ -48,7 +48,3 @@ Aplicación web para el registro y seguimiento de participantes (valientes) en l
 - Módulo de asistencias.
 - Dashboard y estadísticas.
 - Gestión de usuarios y roles desde la UI.
-
----
-
-Para el detalle de las tablas creadas y los servicios implementados, ver [`CHANGES_DATA_EXPRESS.md`](./CHANGES_DATA_EXPRESS.md).
