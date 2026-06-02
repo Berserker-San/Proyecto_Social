@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  UserCheck, HeartPulse, GraduationCap, Home, Users,
-  ChevronRight, Save, Loader2, AlertCircle, CheckCircle2,
+  UserCheck, HeartPulse, GraduationCap, Home, Users, Zap,
+  ChevronRight, Save, Loader2, AlertCircle, CheckCircle2, Plus,
 } from 'lucide-react';
 import { getValienteById, actualizarValiente } from '../../lib/services/valientes.service';
 import {
   guardarSalud, guardarEducacion, guardarUbicacion,
-  guardarContextoFamiliar, guardarPerfilDeportivo,
+  guardarContextoFamiliar, guardarPerfilDeportivo, guardarPerfilSoroca,
 } from '../../lib/services/perfiles.service';
+import { supabase } from '../../lib/supabase';
 import type { ValienteCompleto } from '../../types/database.types';
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -69,11 +70,12 @@ const Field = ({
 );
 
 const TABS = [
-  { id: 'general',  label: 'Identidad',  icon: UserCheck     },
-  { id: 'health',   label: 'Salud',      icon: HeartPulse    },
-  { id: 'academic', label: 'Educacion',  icon: GraduationCap },
-  { id: 'socio',    label: 'Entorno',    icon: Home          },
-  { id: 'family',   label: 'Red Apoyo',  icon: Users         },
+  { id: 'general',   label: 'Identidad',  icon: UserCheck     },
+  { id: 'health',    label: 'Salud',      icon: HeartPulse    },
+  { id: 'academic',  label: 'Educacion',  icon: GraduationCap },
+  { id: 'socio',     label: 'Entorno',    icon: Home          },
+  { id: 'family',    label: 'Red Apoyo',  icon: Users         },
+  { id: 'programas', label: 'Programas',  icon: Zap           },
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────
@@ -117,6 +119,18 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
   const [perfilDep, setPerfilDep] = useState({
     disciplina: '', talla_camisa: '', talla_guayos: '', talla_pantalon: '',
   });
+
+  // ── Estado para pestaña Programas ─────────────────────────────────────
+  // Programa a agregar
+  const [nuevoProg, setNuevoProg]           = useState<'TRIBU' | 'SOROCA' | ''>('');
+  const [nuevaDisciplina, setNuevaDisciplina] = useState('');
+  const [nuevoMacro, setNuevoMacro]          = useState('');
+  const [savingProg, setSavingProg]          = useState(false);
+  const [progMsg, setProgMsg]               = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  // Edición de inscripciones existentes
+  const [editDisciplina, setEditDisciplina] = useState('');
+  const [editMacro, setEditMacro]           = useState('');
+  const [savingEdit, setSavingEdit]         = useState(false);
 
   // ── Carga inicial ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -179,6 +193,9 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
           talla_guayos:   data.perfil_deportivo?.talla_guayos ?? '',
           talla_pantalon: data.perfil_deportivo?.talla_pantalon ?? '',
         });
+        // Inicializar edición de programas existentes
+        setEditDisciplina(data.perfil_deportivo?.disciplina ?? '');
+        setEditMacro(data.perfil_soroca?.macro ?? '');
       })
       .catch(err => setError(err?.message ?? 'Error al cargar'))
       .finally(() => setLoading(false));
@@ -186,6 +203,128 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
 
   const ch = (setter: React.Dispatch<React.SetStateAction<any>>) =>
     (name: string, value: string) => setter((prev: any) => ({ ...prev, [name]: value }));
+
+  // ── Guardar edición disciplina/macro existentes ────────────────────────
+  const handleSaveEdit = async () => {
+    if (!valiente) return;
+    setSavingEdit(true);
+    setProgMsg(null);
+    try {
+      const isTribu  = valiente.programas?.some(p => p.programa?.codigo === 'TRIBU');
+      const isSoroca = valiente.programas?.some(p => p.programa?.codigo === 'SOROCA');
+
+      if (isTribu && editDisciplina) {
+        await guardarPerfilDeportivo({
+          valiente_id: valienteId,
+          disciplina: editDisciplina,
+          talla_camisa: valiente.perfil_deportivo?.talla_camisa ?? null,
+          talla_guayos: valiente.perfil_deportivo?.talla_guayos ?? null,
+          talla_pantalon: valiente.perfil_deportivo?.talla_pantalon ?? null,
+          tiene_experiencia_previa: valiente.perfil_deportivo?.tiene_experiencia_previa ?? false,
+          experiencia_previa: valiente.perfil_deportivo?.experiencia_previa ?? null,
+          horario_entrenamiento: valiente.perfil_deportivo?.horario_entrenamiento ?? null,
+        } as any);
+        // Actualizar nivel en valiente_programa
+        const progTribu = valiente.programas?.find(p => p.programa?.codigo === 'TRIBU');
+        if (progTribu) {
+          await supabase.from('valiente_programa').update({ nivel: editDisciplina }).eq('id', progTribu.id);
+        }
+      }
+
+      if (isSoroca && editMacro) {
+        await guardarPerfilSoroca({
+          valiente_id: valienteId,
+          macro: editMacro,
+          simbolo: valiente.perfil_soroca?.simbolo ?? null,
+          intereses_artisticos: valiente.perfil_soroca?.intereses_artisticos ?? null,
+          habilidades: valiente.perfil_soroca?.habilidades ?? null,
+          proyectos_personales: valiente.perfil_soroca?.proyectos_personales ?? null,
+        });
+        // Actualizar nivel en valiente_programa
+        const progSoroca = valiente.programas?.find(p => p.programa?.codigo === 'SOROCA');
+        if (progSoroca) {
+          await supabase.from('valiente_programa').update({ nivel: editMacro }).eq('id', progSoroca.id);
+        }
+      }
+
+      setProgMsg({ type: 'ok', text: 'Cambios guardados correctamente.' });
+      // Recargar valiente para reflejar cambios
+      const updated = await getValienteById(valienteId);
+      setValiente(updated);
+    } catch (err: any) {
+      setProgMsg({ type: 'err', text: err?.message ?? 'Error al guardar.' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ── Agregar nuevo programa ─────────────────────────────────────────────
+  const handleAgregarPrograma = async () => {
+    if (!nuevoProg) return;
+    if (nuevoProg === 'TRIBU' && !nuevaDisciplina) {
+      setProgMsg({ type: 'err', text: 'Selecciona la disciplina (Rugby o Ultimate).' });
+      return;
+    }
+    if (nuevoProg === 'SOROCA' && !nuevoMacro) {
+      setProgMsg({ type: 'err', text: 'Selecciona el macro de SOROCA.' });
+      return;
+    }
+    setSavingProg(true);
+    setProgMsg(null);
+    try {
+      // Obtener el id del programa
+      const { data: progData } = await supabase
+        .from('programa').select('id').eq('codigo', nuevoProg).maybeSingle();
+      if (!progData) throw new Error(`Programa ${nuevoProg} no encontrado.`);
+
+      const nivel = nuevoProg === 'TRIBU' ? nuevaDisciplina : nuevoMacro;
+
+      // Insertar en valiente_programa
+      const { error: inscErr } = await supabase.from('valiente_programa').insert({
+        valiente_id: valienteId,
+        programa_id: progData.id,
+        es_principal: false,
+        fecha_ingreso: new Date().toISOString().split('T')[0],
+        fecha_egreso: null,
+        estado: 'ACTIVO',
+        nivel,
+        cohorte: null, sede: null, motivacion: null,
+        compromisos: null, transformaciones_subjetivas: null,
+      });
+      if (inscErr) throw inscErr;
+
+      // Crear/actualizar perfil correspondiente
+      if (nuevoProg === 'TRIBU') {
+        await guardarPerfilDeportivo({
+          valiente_id: valienteId,
+          disciplina: nuevaDisciplina,
+          talla_camisa: null, talla_guayos: null, talla_pantalon: null,
+          tiene_experiencia_previa: false, experiencia_previa: null,
+          horario_entrenamiento: null,
+        } as any);
+        setEditDisciplina(nuevaDisciplina);
+      } else {
+        await guardarPerfilSoroca({
+          valiente_id: valienteId,
+          macro: nuevoMacro,
+          simbolo: null, intereses_artisticos: null,
+          habilidades: null, proyectos_personales: null,
+        });
+        setEditMacro(nuevoMacro);
+      }
+
+      setProgMsg({ type: 'ok', text: `Valiente inscrito en ${nuevoProg} correctamente.` });
+      setNuevoProg('');
+      setNuevaDisciplina('');
+      setNuevoMacro('');
+      const updated = await getValienteById(valienteId);
+      setValiente(updated);
+    } catch (err: any) {
+      setProgMsg({ type: 'err', text: err?.message ?? 'Error al inscribir.' });
+    } finally {
+      setSavingProg(false);
+    }
+  };
 
   // ── Guardar ───────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -444,6 +583,193 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
           <Field label="Celular"         name="celular"         value={acudiente.celular}         onChange={ch(setAcudiente)} type="tel" />
           <Field label="Email"           name="email"           value={acudiente.email}           onChange={ch(setAcudiente)} type="email" />
         </Section>
+      )}
+
+      {/* ── TAB: PROGRAMAS ── */}
+      {activeTab === 'programas' && (
+        <div className="space-y-4">
+
+          {/* Feedback */}
+          {progMsg && (
+            <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm border ${
+              progMsg.type === 'ok'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              {progMsg.type === 'ok' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+              {progMsg.text}
+            </div>
+          )}
+
+          {/* Programas actuales */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-50 pb-2">
+              Programas actuales
+            </h3>
+
+            {(!valiente.programas || valiente.programas.length === 0) ? (
+              <p className="text-sm text-slate-400 italic">Sin programas inscritos.</p>
+            ) : (
+              <div className="space-y-4">
+                {valiente.programas.map(p => {
+                  const codigo = p.programa?.codigo;
+                  const isTribu  = codigo === 'TRIBU';
+                  const isSoroca = codigo === 'SOROCA';
+                  return (
+                    <div key={p.id}
+                      className={`p-4 rounded-xl border-2 ${isTribu ? 'border-indigo-200 bg-indigo-50' : isSoroca ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className={`text-sm font-black ${isTribu ? 'text-indigo-800' : isSoroca ? 'text-emerald-800' : 'text-slate-700'}`}>
+                          {p.programa?.nombre ?? codigo}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded font-bold ${
+                          p.estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        }`}>{p.estado}</span>
+                      </div>
+
+                      {isTribu && (
+                        <div>
+                          <label className="text-xs text-slate-500 font-semibold block mb-1 uppercase tracking-wide">
+                            Disciplina
+                          </label>
+                          <select
+                            value={editDisciplina}
+                            onChange={e => setEditDisciplina(e.target.value)}
+                            className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-indigo-400"
+                          >
+                            <option value="">Seleccionar...</option>
+                            <option value="Rugby">Rugby</option>
+                            <option value="Ultimate">Ultimate</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isSoroca && (
+                        <div>
+                          <label className="text-xs text-slate-500 font-semibold block mb-1 uppercase tracking-wide">
+                            Macro
+                          </label>
+                          <select
+                            value={editMacro}
+                            onChange={e => setEditMacro(e.target.value)}
+                            className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-400"
+                          >
+                            <option value="">Seleccionar...</option>
+                            <option value="Soñar">Soñar</option>
+                            <option value="Romper">Romper</option>
+                            <option value="Cambiar">Cambiar</option>
+                            <option value="Mundo Cotidiano">Mundo Cotidiano</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                  >
+                    {savingEdit ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {savingEdit ? 'Guardando...' : 'Guardar cambios de programas'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Inscribir en nuevo programa */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-50 pb-2">
+              Inscribir en nuevo programa
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-500 font-semibold block mb-1 uppercase tracking-wide">
+                  Programa
+                </label>
+                <select
+                  value={nuevoProg}
+                  onChange={e => {
+                    setNuevoProg(e.target.value as 'TRIBU' | 'SOROCA' | '');
+                    setNuevaDisciplina('');
+                    setNuevoMacro('');
+                  }}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white"
+                >
+                  <option value="">Seleccionar programa...</option>
+                  {!valiente.programas?.some(p => p.programa?.codigo === 'TRIBU') && (
+                    <option value="TRIBU">TRIBU</option>
+                  )}
+                  {!valiente.programas?.some(p => p.programa?.codigo === 'SOROCA') && (
+                    <option value="SOROCA">SOROCA</option>
+                  )}
+                </select>
+              </div>
+
+              {nuevoProg === 'TRIBU' && (
+                <div>
+                  <label className="text-xs text-slate-500 font-semibold block mb-1 uppercase tracking-wide">
+                    Disciplina
+                  </label>
+                  <select
+                    value={nuevaDisciplina}
+                    onChange={e => setNuevaDisciplina(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white"
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="Rugby">Rugby</option>
+                    <option value="Ultimate">Ultimate</option>
+                  </select>
+                </div>
+              )}
+
+              {nuevoProg === 'SOROCA' && (
+                <div>
+                  <label className="text-xs text-slate-500 font-semibold block mb-1 uppercase tracking-wide">
+                    Macro
+                  </label>
+                  <select
+                    value={nuevoMacro}
+                    onChange={e => setNuevoMacro(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:border-emerald-400 focus:bg-white"
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="Soñar">Soñar</option>
+                    <option value="Romper">Romper</option>
+                    <option value="Cambiar">Cambiar</option>
+                    <option value="Mundo Cotidiano">Mundo Cotidiano</option>
+                  </select>
+                </div>
+              )}
+
+              {nuevoProg && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleAgregarPrograma}
+                    disabled={savingProg}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                  >
+                    {savingProg ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    {savingProg ? 'Inscribiendo...' : `Inscribir en ${nuevoProg}`}
+                  </button>
+                </div>
+              )}
+
+              {/* Si ya está en ambos programas */}
+              {valiente.programas?.some(p => p.programa?.codigo === 'TRIBU') &&
+               valiente.programas?.some(p => p.programa?.codigo === 'SOROCA') && (
+                <p className="text-sm text-slate-400 italic text-center py-2">
+                  El valiente ya está inscrito en todos los programas disponibles.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Botón guardar inferior */}
