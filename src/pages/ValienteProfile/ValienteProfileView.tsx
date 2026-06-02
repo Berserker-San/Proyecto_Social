@@ -375,12 +375,20 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
 
   const handleDescargar = async (doc: ValienteDocumento) => {
     if (!doc.url_archivo) return;
+
+    // Si la URL guardada es externa (ej. Google Drive), abrir directamente
+    if (doc.url_archivo.startsWith('http')) {
+      window.open(doc.url_archivo, '_blank');
+      return;
+    }
+
     setDescargando(doc.id);
     try {
       const url = await getUrlDescarga(doc.url_archivo);
       window.open(url, '_blank');
     } catch (e) {
       console.error(e);
+      alert('No se pudo obtener el archivo. Es posible que haya sido eliminado del almacenamiento.');
     } finally {
       setDescargando(null);
     }
