@@ -83,16 +83,6 @@ const Empty = () => (
   </div>
 );
 
-// Separador de sección
-const SectionDivider: React.FC<{ label: string; icon: React.ReactNode }> = ({ label, icon }) => (
-  <div className="stats-chart-card--wide" style={{ gridColumn: '1 / -1' }}>
-    <div className="flex items-center gap-2 px-2 py-3 border-b border-slate-100">
-      <span className="text-slate-400">{icon}</span>
-      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-    </div>
-  </div>
-);
-
 // ── Componente ────────────────────────────────────────────────────────────
 
 const VitalContextTab: React.FC = () => {

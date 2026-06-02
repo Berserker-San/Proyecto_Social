@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import { signIn as authSignIn, signOut as authSignOut, getCurrentUsuarioSistema } from '../services/auth.service';
-// import type { UsuarioSistema } from '../../types/database.types';
+import type { UsuarioSistema } from '../../types/database.types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

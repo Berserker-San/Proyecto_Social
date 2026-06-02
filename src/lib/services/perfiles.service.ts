@@ -3,7 +3,6 @@ import type {
   ValienteUbicacion,
   ValienteSalud,
   ValienteEducacion,
-  ValienteOcupacion,
   ValienteContextoFamiliar,
   ValientePerfilDeportivo,
   ValientePerfilSoroca,
@@ -80,29 +79,6 @@ export async function getEducacion(valienteId: number) {
 
   if (error) throw error;
   return data as ValienteEducacion | null;
-}
-
-// OCUPACIÓN
-export async function guardarOcupacion(ocupacion: Omit<ValienteOcupacion, 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('valiente_ocupacion')
-    .upsert(ocupacion)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as ValienteOcupacion;
-}
-
-export async function getOcupacion(valienteId: number) {
-  const { data, error } = await supabase
-    .from('valiente_ocupacion')
-    .select('*')
-    .eq('valiente_id', valienteId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data as ValienteOcupacion | null;
 }
 
 // CONTEXTO FAMILIAR

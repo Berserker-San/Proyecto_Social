@@ -4,6 +4,7 @@
  * Validates: Requirement 3.5
  */
 import { describe, it, expect, vi } from 'vitest';
+import '@testing-library/jest-dom';
 import { render } from '@testing-library/react';
 import * as fc from 'fast-check';
 import ValienteDirectoryRow from './ValienteDirectoryRow';

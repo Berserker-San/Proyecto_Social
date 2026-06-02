@@ -121,7 +121,7 @@ const NavDirectoryPanel: React.FC<NavDirectoryPanelProps> = ({
       tipo_documento: row.tipo_documento,
       foto_url: row.foto_url,
       estado: row.estado,
-      programas: (row.programas as Array<{ programa: { codigo: string } }>) ?? [],
+      programas: (row.programas as unknown as Array<{ programa: { codigo: string } }>) ?? [],
     }));
 
     setValientes(items);

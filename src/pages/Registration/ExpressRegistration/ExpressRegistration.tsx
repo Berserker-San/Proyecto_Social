@@ -56,6 +56,8 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         lugar_nacimiento: null,
         lugar_nacimiento_ciudad_id: null,
         nacionalidad: 'Colombiana',
+        trabaja_estudia: null,
+        hobbies: null,
         estado: 'ACTIVO',
         foto_url: null,
         created_by: null,
@@ -84,7 +86,9 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
       await guardarSalud({
         valiente_id: valiente.id,
         eps_id: null,
+        eps_nombre: null,
         ips_id: null,
+        ips_nombre: null,
         tipo_sangre: null,
         tiene_discapacidad: false,
         tipo_discapacidad: null,
@@ -114,9 +118,33 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
 
       // 6. Crear registros vacíos en tablas restantes para que el perfil exista
       await Promise.all([
-        guardarUbicacion({ valiente_id: valiente.id }),
-        guardarEducacion({ valiente_id: valiente.id }),
-        guardarContextoFamiliar({ valiente_id: valiente.id }),
+        guardarUbicacion({
+          valiente_id: valiente.id,
+          direccion: null,
+          ciudad_id: null,
+          comuna_id: null,
+          barrio_id: null,
+          estrato: null,
+          latitud: null,
+          longitud: null,
+        }),
+        guardarEducacion({
+          valiente_id: valiente.id,
+          nivel_educativo: null,
+          grado_actual: null,
+          institucion_id: null,
+          materia_favorita: null,
+          materia_dificil: null,
+        }),
+        guardarContextoFamiliar({
+          valiente_id: valiente.id,
+          composicion_familiar: null,
+          numero_personas_hogar: null,
+          ingreso_mensual_hogar: null,
+          es_victima_conflicto: null,
+          esta_en_ruv: null,
+          etnia: null,
+        }),
       ]);
 
       // 7. Inscribir en programa TRIBU

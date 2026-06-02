@@ -34,7 +34,7 @@ const ValientesListView: React.FC<ValientesListViewProps> = ({ onSelectValiente,
         .order('nombres', { ascending: true });
 
       if (data) {
-        setValientes(data as ValienteListItem[]);
+        setValientes(data as unknown as ValienteListItem[]);
       }
       setLoading(false);
     };
