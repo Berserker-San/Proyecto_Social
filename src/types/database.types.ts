@@ -60,6 +60,14 @@ export interface IPS {
   created_at: string | null;
 }
 
+export interface Barrio {
+  id: number;
+  nombre: string;
+  ciudad_id: number | null;
+  comuna_id: number | null;
+  created_at: string | null;
+}
+
 // =========================================================
 // SEGURIDAD Y USUARIOS
 // =========================================================
@@ -366,6 +374,24 @@ export interface AcompanamientoConNahual extends Acompanamiento {
 // =========================================================
 // TIPOS COMPUESTOS
 // =========================================================
+
+/** Alias para compatibilidad con perfiles.service (no existe tabla propia) */
+export interface ValienteOcupacion {
+  valiente_id: number;
+  trabaja_estudia: string | null;
+  lugar_trabajo: string | null;
+  descripcion_trabajo: string | null;
+  updated_at: string | null;
+}
+
+/**
+ * Tipo mínimo requerido por @supabase/supabase-js createClient<Database>.
+ * No necesita reflejar todo el esquema; con un objeto vacío basta para
+ * satisfacer el genérico sin romper las consultas con tipado dinámico.
+ * @deprecated — supabase.ts usa createClient<any> directamente.
+ */
+export type Database = Record<string, unknown>;
+
 
 export interface ValienteCompleto extends Valiente {
   edad?: number;

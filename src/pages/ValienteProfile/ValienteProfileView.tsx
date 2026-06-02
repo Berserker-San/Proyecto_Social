@@ -3,7 +3,7 @@ import {
   UserCheck, HeartPulse, GraduationCap, Home, Users, Zap, Shield, Activity,
   Search, ChevronRight, MapPin, Leaf, FileText, AlertCircle, Pencil,
   Plus, Trash2, ChevronDown, ChevronUp, Calendar, Save, X,
-  Download, Eye, Flame, Wind, Droplets, Mountain, Sparkles,
+  Download, Flame, Wind, Droplets, Mountain, Sparkles,
 } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
 import { getValienteById, calcularEdad, getHistorialValiente } from '../../lib/services/valientes.service';
@@ -25,7 +25,7 @@ import {
 } from '../../lib/services/documentos.service';
 import { getNombreCompleto } from '../../lib/utils/valienteHelpers';
 import { useAuth } from '../../lib/hooks/useAuth';
-import type { Valiente, ValienteCompleto, AcompanamientoConNahual, ValienteDocumento, HistorialValiente } from '../../types/database.types';
+import type { Valiente, ValienteCompleto, ValientePrograma, Programa, AcompanamientoConNahual, ValienteDocumento, HistorialValiente } from '../../types/database.types';
 
 // =========================================================
 // PROPS
@@ -456,10 +456,8 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
 
   const acudientePrincipal = valiente.acudientes?.[0]?.acudiente ?? null;
 
-  // Documentos (aproximación)
-  const docIdCopy = valiente.estado !== 'INACTIVO';
-  const docEpsCert = valiente.salud?.eps_id != null;
-  const docConsent = valiente.acudientes?.[0]?.acudiente?.tiene_autorizacion_firmada ?? false;
+  // Documentos (aproximación — estado real viene de la tabla valiente_documento)
+  // Las variables de estado se usan en el sidebar a través de `documentos`
 
   // Tabs
   const tabs = [
@@ -474,10 +472,11 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
   ];
 
   // Historial: combinar eventos de historial_valiente + ingresos/egresos de programas
+  type ProgramaItem = ValientePrograma & { programa: Programa };
   type TimelineItem =
     | { kind: 'historial'; data: HistorialValiente }
-    | { kind: 'programa_ingreso'; data: ValienteCompleto['programas'][number]; date: string }
-    | { kind: 'programa_egreso'; data: ValienteCompleto['programas'][number]; date: string };
+    | { kind: 'programa_ingreso'; data: ProgramaItem; date: string }
+    | { kind: 'programa_egreso'; data: ProgramaItem; date: string };
 
   const timelineItems: TimelineItem[] = [
     ...historial.map((h) => ({ kind: 'historial' as const, data: h })),
@@ -1166,7 +1165,7 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 <p className="text-sm text-slate-400 italic">Sin eventos registrados.</p>
               ) : (
                 <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:w-0.5 before:bg-slate-200">
-                  {timelineItems.map((item, idx) => {
+                  {timelineItems.map((item) => {
                     if (item.kind === 'historial') {
                       const h = item.data;
                       const esImportante = h.es_importante ?? false;

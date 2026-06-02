@@ -72,7 +72,7 @@ export async function getEstadisticasPorPrograma(): Promise<EstadisticaPrograma[
   const conteo: Record<string, number> = {};
 
   for (const row of data ?? []) {
-    const nombre = (row.programa as { nombre: string } | null)?.nombre ?? 'Sin programa';
+    const nombre = (row.programa as unknown as { nombre: string } | null)?.nombre ?? 'Sin programa';
     conteo[nombre] = (conteo[nombre] ?? 0) + 1;
   }
 
