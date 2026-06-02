@@ -1274,10 +1274,19 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 </div>
                 {/* Mostrar tipo de programa SOROCA */}
                 {valiente.programas?.find(p => p.programa?.codigo === 'SOROCA')?.nivel && (
-                  <div className="mt-4 pt-4 border-t border-emerald-200">
-                    <div className="text-xs text-emerald-700 font-semibold mb-1">Tipo de Programa</div>
-                    <div className="text-sm font-bold text-emerald-900">
-                      {valiente.programas.find(p => p.programa?.codigo === 'SOROCA')?.nivel}
+                  <div className="mt-4 pt-4 border-t border-emerald-200 space-y-3">
+                    <div>
+                      <div className="text-xs text-emerald-700 font-semibold mb-1">Tipo de Programa</div>
+                      <div className="text-sm font-bold text-emerald-900">
+                        {valiente.programas.find(p => p.programa?.codigo === 'SOROCA')?.nivel}
+                      </div>
+                    </div>
+                    <div className="flex justify-center mt-3">
+                      <img
+                        src={getSorocaLogoPath(valiente.programas?.find(p => p.programa?.codigo === 'SOROCA')?.nivel)}
+                        alt="Logo del programa"
+                        className="w-14 h-14 object-contain"
+                      />
                     </div>
                   </div>
                 )}
@@ -1292,6 +1301,24 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 <Shield size={18} /> Elementos Tribu
               </h3>
               <div className="space-y-3">
+                {/* Logos de Ascua y Fuego */}
+                {valiente.perfil_deportivo?.disciplina && (
+                  <div className="flex gap-3 items-center justify-center mb-4">
+                    {valiente.perfil_deportivo.disciplina.toLowerCase().includes('rugby') && (
+                      <div className="flex flex-col items-center">
+                        <img src="/images/simbolo-ascua.png" alt="TRIBU de Ascua" className="w-12 h-12 object-contain" />
+                        <span className="text-xs text-indigo-600 font-semibold mt-1">Ascua</span>
+                      </div>
+                    )}
+                    {valiente.perfil_deportivo.disciplina.toLowerCase().includes('ultimate') && (
+                      <div className="flex flex-col items-center">
+                        <img src="/images/simbolo-fuego.png" alt="TRIBU de Fuego" className="w-12 h-12 object-contain" />
+                        <span className="text-xs text-indigo-600 font-semibold mt-1">Fuego</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Mostrar disciplina */}
                 {valiente.perfil_deportivo?.disciplina && (
                   <div className="bg-white p-3 rounded-lg border border-indigo-200">

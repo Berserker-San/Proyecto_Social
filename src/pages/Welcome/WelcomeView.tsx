@@ -61,7 +61,6 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onSelectProgram }) => {
                   <img src="/images/logo-soroca.png" alt="Logo Soroca" className="program-logo-img" />
                 </div>
                 <div>
-                  <h3 className="program-card-name">SOROCA</h3>
                   <span className="program-card-badge">Formación</span>
                 </div>
               </div>
