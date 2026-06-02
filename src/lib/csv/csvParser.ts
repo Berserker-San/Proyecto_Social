@@ -417,6 +417,14 @@ function getColumnValueAfter(
 // PARSER PRINCIPAL
 // =========================================================
 
+export function generateCSVTemplate(): Blob {
+  const headers = Object.values(CSV_COLUMNS).flat();
+  const headerRow = headers.map(h => `"${h}"`).join(',');
+  const emptyRow = headers.map(() => '').join(',');
+  const csv = `${headerRow}\n${emptyRow}`;
+  return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+}
+
 export function parseCSV(text: string): ParseResult {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
   if (lines.length < 2) return { valid: [], invalid: [] };
