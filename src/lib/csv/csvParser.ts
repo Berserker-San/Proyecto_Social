@@ -81,6 +81,12 @@ export type ValientePerfilDeportivoCSVRow = {
   talla_pantalon: string | null;
 };
 
+export type ValienteDocumentoCSVRow = {
+  documento_identidad_url: string | null;
+  eps_url: string | null;
+  consentimiento_url: string | null;
+};
+
 export interface ParsedRow {
   valiente: ValienteCSVRow;
   ubicacion: UbicacionCSVRow;
@@ -91,6 +97,7 @@ export interface ParsedRow {
   valiente_acudiente: ValienteAcudienteCSVRow | null;
   programa: ValienteProgramaCSVRow;
   perfil_deportivo: ValientePerfilDeportivoCSVRow | null;
+  documentos: ValienteDocumentoCSVRow;
 }
 
 export interface RowError {
@@ -642,6 +649,11 @@ export function parseCSV(text: string): ParseResult {
       valiente_acudiente,
       programa,
       perfil_deportivo,
+      documentos: {
+        documento_identidad_url: h(CSV_COLUMNS.idDocumentoDrive) || null,
+        eps_url: h(CSV_COLUMNS.epsSubidoDrive) || null,
+        consentimiento_url: h(CSV_COLUMNS.consentimientoSubidoDrive) || null,
+      },
     });
   }
 

@@ -563,6 +563,43 @@ export async function insertValientesBatch(
       );
     }
 
+    // i. Documentos: insertar URLs de documentos del CSV.
+    if (row.documentos) {
+      const docs: Array<{ tipo: string; url: string }> = [];
+
+      if (row.documentos.documento_identidad_url) {
+        docs.push({ tipo: 'identidad', url: row.documentos.documento_identidad_url });
+      }
+      if (row.documentos.eps_url) {
+        docs.push({ tipo: 'eps', url: row.documentos.eps_url });
+      }
+      if (row.documentos.consentimiento_url) {
+        docs.push({ tipo: 'consentimiento', url: row.documentos.consentimiento_url });
+      }
+
+      for (const doc of docs) {
+        relacionadas.push(
+          Promise.resolve(
+            supabase
+              .from('valiente_documento')
+              .upsert({
+                valiente_id: valienteId,
+                tipo_documento: doc.tipo,
+                nombre_archivo: null,
+                url_archivo: doc.url,
+                tamano_bytes: null,
+                esta_verificado: false,
+                verificado_por: null,
+                verificado_en: null,
+                subido_por: null,
+              }, { onConflict: 'valiente_id,tipo_documento' })
+          ).then(({ error }) => {
+            if (error) console.error(`[csvUpload] documento ${doc.tipo} valiente ${valienteId}:`, error.message);
+          })
+        );
+      }
+    }
+
     await Promise.all(relacionadas);
 
     report.insertedCount++;
