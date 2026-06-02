@@ -3,6 +3,7 @@ import type {
   Valiente,
   ValienteCompleto,
   Acudiente,
+  HistorialValiente,
 } from '../../types/database.types';
 
 // =========================================================
@@ -126,6 +127,20 @@ export async function eliminarValiente(id: number): Promise<void> {
 
   const { error } = await supabase.from('valiente').delete().eq('id', id);
   if (error) throw error;
+}
+
+/**
+ * Obtener todos los eventos del historial de un valiente
+ */
+export async function getHistorialValiente(valienteId: number): Promise<HistorialValiente[]> {
+  const { data, error } = await supabase
+    .from('historial_valiente')
+    .select('*')
+    .eq('valiente_id', valienteId)
+    .order('fecha_evento', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as HistorialValiente[];
 }
 
 /**
@@ -338,6 +353,10 @@ export interface DatosRegistroCompleto {
   allergyDetails: string;
   hasMedication: string;
   medicationDetails: string;
+  hasTreatment: string;
+  treatmentDetails: string;
+  hasDiagnosis: string;
+  diagnosisDetails: string;
   // Socioeconómico
   familyComposition: string;
   familyCount: string;
@@ -438,11 +457,11 @@ export async function registrarValienteCompleto(
     tipo_sangre: cleanText(datos.bloodType),
     tiene_discapacidad: isYes(datos.hasDisability),
     tipo_discapacidad: isYes(datos.hasDisability) ? cleanText(datos.disabilityDetails) : null,
-    diagnostico_medico: null,
+    diagnostico_medico: isYes(datos.hasDiagnosis) ? cleanText(datos.diagnosisDetails) : null,
     tiene_alergias: isYes(datos.hasAllergy),
     alergias: isYes(datos.hasAllergy) ? cleanText(datos.allergyDetails) : null,
     medicamentos_actuales: isYes(datos.hasMedication) ? cleanText(datos.medicationDetails) : null,
-    tratamiento_en_curso: isYes(datos.hasMedication) ? cleanText(datos.medicationDetails) : null,
+    tratamiento_en_curso: isYes(datos.hasTreatment) ? cleanText(datos.treatmentDetails) : null,
     contacto_emergencia_nombre: null,
     contacto_emergencia_telefono: null,
     contacto_emergencia_parentesco: null,

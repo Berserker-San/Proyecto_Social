@@ -6,12 +6,13 @@ import {
   Download, Eye, Flame, Wind, Droplets, Mountain, Sparkles,
 } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
-import { getValienteById, calcularEdad } from '../../lib/services/valientes.service';
+import { getValienteById, calcularEdad, getHistorialValiente } from '../../lib/services/valientes.service';
 import {
   getAcompanamientosByValiente,
   crearAcompanamiento,
   eliminarAcompanamiento,
 } from '../../lib/services/acompanamiento.service';
+import { toggleAutorizacion } from '../../lib/services/acudientes.service';
 import {
   asignarInsignia,
   INSIGNIAS_SOROCA,
@@ -24,7 +25,7 @@ import {
 } from '../../lib/services/documentos.service';
 import { getNombreCompleto } from '../../lib/utils/valienteHelpers';
 import { useAuth } from '../../lib/hooks/useAuth';
-import type { Valiente, ValienteCompleto, AcompanamientoConNahual, ValienteDocumento } from '../../types/database.types';
+import type { Valiente, ValienteCompleto, AcompanamientoConNahual, ValienteDocumento, HistorialValiente } from '../../types/database.types';
 
 // =========================================================
 // PROPS
@@ -212,6 +213,14 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [descargando, setDescargando] = useState<number | null>(null);
 
+  // Estado para autorización firmada
+  const [autorizacion, setAutorizacion] = useState<boolean>(false);
+  const [togglingAuth, setTogglingAuth] = useState(false);
+
+  // Estado para historial
+  const [historial, setHistorial] = useState<HistorialValiente[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+
   // Cargar datos al montar o cuando cambia valienteId
   useEffect(() => {
     let cancelled = false;
@@ -296,7 +305,36 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
     }
   }, [valiente]);
 
-  // Cargar documentos al abrir el tab Red Apoyo (donde los mostraremos)
+  // Sincronizar autorización firmada cuando carga el valiente
+  useEffect(() => {
+    const firmada = valiente?.acudientes?.[0]?.acudiente?.tiene_autorizacion_firmada ?? false;
+    setAutorizacion(!!firmada);
+  }, [valiente]);
+
+  const handleToggleAutorizacion = async () => {
+    const acudienteId = valiente?.acudientes?.[0]?.acudiente?.id;
+    if (!acudienteId) return;
+    setTogglingAuth(true);
+    try {
+      const nuevo = !autorizacion;
+      await toggleAutorizacion(acudienteId, nuevo);
+      setAutorizacion(nuevo);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTogglingAuth(false);
+    }
+  };
+
+  // Cargar documentos al montar (necesario para el sidebar de Documentos)
+  useEffect(() => {
+    if (!valienteId) return;
+    getDocumentosValiente(valienteId)
+      .then(setDocumentos)
+      .catch(console.error);
+  }, [valienteId]);
+
+  // Recargar documentos también al abrir el tab Red Apoyo (por si se subió algo)
   useEffect(() => {
     if (activeTab !== 'family' || !valienteId) return;
     setLoadingDocs(true);
@@ -304,6 +342,16 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
       .then(setDocumentos)
       .catch(console.error)
       .finally(() => setLoadingDocs(false));
+  }, [activeTab, valienteId]);
+
+  // Cargar historial al abrir el tab Historial
+  useEffect(() => {
+    if (activeTab !== 'history' || !valienteId) return;
+    setLoadingHistorial(true);
+    getHistorialValiente(valienteId)
+      .then(setHistorial)
+      .catch(console.error)
+      .finally(() => setLoadingHistorial(false));
   }, [activeTab, valienteId]);
 
   const handleAsignarInsignia = async () => {
@@ -425,12 +473,25 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
     { id: 'history', label: 'Historial', icon: Activity },
   ];
 
-  // Historial: usar programas como eventos de línea de tiempo
-  const timelineEvents = (valiente.programas ?? [])
-    .filter((p) => p.fecha_ingreso)
-    .sort(
-      (a, b) => new Date(b.fecha_ingreso).getTime() - new Date(a.fecha_ingreso).getTime()
-    );
+  // Historial: combinar eventos de historial_valiente + ingresos/egresos de programas
+  type TimelineItem =
+    | { kind: 'historial'; data: HistorialValiente }
+    | { kind: 'programa_ingreso'; data: ValienteCompleto['programas'][number]; date: string }
+    | { kind: 'programa_egreso'; data: ValienteCompleto['programas'][number]; date: string };
+
+  const timelineItems: TimelineItem[] = [
+    ...historial.map((h) => ({ kind: 'historial' as const, data: h })),
+    ...(valiente.programas ?? [])
+      .filter((p) => p.fecha_ingreso)
+      .map((p) => ({ kind: 'programa_ingreso' as const, data: p, date: p.fecha_ingreso })),
+    ...(valiente.programas ?? [])
+      .filter((p) => p.fecha_egreso)
+      .map((p) => ({ kind: 'programa_egreso' as const, data: p, date: p.fecha_egreso! })),
+  ].sort((a, b) => {
+    const dateA = a.kind === 'historial' ? a.data.fecha_evento : a.date;
+    const dateB = b.kind === 'historial' ? b.data.fecha_evento : b.date;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  });
 
   return (
     <div className="max-w-6xl mx-auto pb-10">
@@ -681,10 +742,29 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 <GridItem label="Celular" value={acudientePrincipal?.celular} />
                 <GridItem label="Parentesco" value={valiente.acudientes?.[0]?.parentesco} />
                 <GridItem label="Email" value={acudientePrincipal?.email} />
-                <GridItem
-                  label="Autorización Firmada"
-                  value={acudientePrincipal?.tiene_autorizacion_firmada ? 'Sí' : 'No'}
-                />
+                {/* Toggle de autorización firmada */}
+                <div className="md:col-span-2 flex items-center justify-between py-2 border-t border-slate-50 mt-1">
+                  <div>
+                    <div className="text-xs text-slate-500 font-semibold mb-0.5">Autorización Firmada</div>
+                    <div className="text-sm text-slate-600">
+                      {autorizacion
+                        ? 'Documento físico recibido'
+                        : 'Pendiente de recibir'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleToggleAutorizacion}
+                    disabled={togglingAuth || !acudientePrincipal}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50
+                      ${autorizacion ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                    title={autorizacion ? 'Marcar como pendiente' : 'Marcar como recibida'}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
+                        ${autorizacion ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </button>
+                </div>
               </Section>
 
               {/* Documentos adjuntos */}
@@ -1077,27 +1157,91 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
           {activeTab === 'history' && (
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <h3 className="font-bold text-slate-800 mb-6">Línea de Tiempo</h3>
-              {timelineEvents.length === 0 ? (
+
+              {loadingHistorial ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400" />
+                </div>
+              ) : timelineItems.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">Sin eventos registrados.</p>
               ) : (
                 <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:w-0.5 before:bg-slate-200">
-                  {timelineEvents.map((item) => (
-                    <div key={item.id} className="relative pl-8">
-                      <div className="absolute left-0 top-1 w-5 h-5 rounded-full bg-slate-200 border-4 border-white" />
-                      <div className="text-xs text-slate-400">{item.fecha_ingreso}</div>
-                      <div className="font-bold text-slate-800 text-sm">
-                        Ingreso a {item.programa?.nombre ?? item.programa?.codigo ?? 'Programa'}
-                      </div>
-                      {item.motivacion && (
-                        <div className="text-sm text-slate-600">{item.motivacion}</div>
-                      )}
-                      {item.fecha_egreso && (
-                        <div className="text-xs text-slate-400 mt-1">
-                          Egreso: {item.fecha_egreso}
+                  {timelineItems.map((item, idx) => {
+                    if (item.kind === 'historial') {
+                      const h = item.data;
+                      const esImportante = h.es_importante ?? false;
+                      return (
+                        <div key={`h-${h.id}`} className="relative pl-8">
+                          <div
+                            className={`absolute left-0 top-1 w-5 h-5 rounded-full border-4 border-white ${
+                              esImportante ? 'bg-amber-400' : 'bg-slate-300'
+                            }`}
+                          />
+                          <div className="text-xs text-slate-400">
+                            {new Date(h.fecha_evento + 'T12:00:00').toLocaleDateString('es-CO', {
+                              day: '2-digit', month: 'long', year: 'numeric',
+                            })}
+                            {h.categoria && (
+                              <span className="ml-2 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold uppercase">
+                                {h.categoria}
+                              </span>
+                            )}
+                          </div>
+                          {h.titulo && (
+                            <div className="font-bold text-slate-800 text-sm mt-0.5">{h.titulo}</div>
+                          )}
+                          {h.descripcion && (
+                            <div className="text-sm text-slate-600 mt-0.5">{h.descripcion}</div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    }
+
+                    if (item.kind === 'programa_ingreso') {
+                      const p = item.data;
+                      return (
+                        <div key={`pi-${p.id}`} className="relative pl-8">
+                          <div className="absolute left-0 top-1 w-5 h-5 rounded-full bg-emerald-400 border-4 border-white" />
+                          <div className="text-xs text-slate-400">
+                            {new Date(p.fecha_ingreso + 'T12:00:00').toLocaleDateString('es-CO', {
+                              day: '2-digit', month: 'long', year: 'numeric',
+                            })}
+                            <span className="ml-2 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold uppercase">
+                              Ingreso
+                            </span>
+                          </div>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5">
+                            Ingreso a {p.programa?.nombre ?? p.programa?.codigo ?? 'Programa'}
+                          </div>
+                          {p.motivacion && (
+                            <div className="text-sm text-slate-600 mt-0.5">{p.motivacion}</div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (item.kind === 'programa_egreso') {
+                      const p = item.data;
+                      return (
+                        <div key={`pe-${p.id}`} className="relative pl-8">
+                          <div className="absolute left-0 top-1 w-5 h-5 rounded-full bg-red-300 border-4 border-white" />
+                          <div className="text-xs text-slate-400">
+                            {new Date(p.fecha_egreso! + 'T12:00:00').toLocaleDateString('es-CO', {
+                              day: '2-digit', month: 'long', year: 'numeric',
+                            })}
+                            <span className="ml-2 px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[10px] font-bold uppercase">
+                              Egreso
+                            </span>
+                          </div>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5">
+                            Egreso de {p.programa?.nombre ?? p.programa?.codigo ?? 'Programa'}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })}
                 </div>
               )}
             </div>
@@ -1174,12 +1318,12 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                           <span className="font-bold">{valiente.perfil_deportivo.talla_pantalon}</span>
                         </div>
                       )}
-                      {valiente.perfil_deportivo.tiene_experiencia_previa && (
+                      {valiente.perfil_deportivo.tiene_experiencia_previa !== null && (
                         <div className="mt-2 pt-2 border-t border-indigo-100">
                           <span className="text-indigo-600">Experiencia previa:</span>
-                          <p className="text-xs text-indigo-800 mt-1">
-                            {valiente.perfil_deportivo.experiencia_previa || 'Sí'}
-                          </p>
+                          <span className="font-bold ml-1">
+                            {valiente.perfil_deportivo.tiene_experiencia_previa ? 'Sí' : 'No'}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1199,9 +1343,18 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
               <FileText size={18} /> Documentos
             </h3>
             <div className="space-y-2">
-              <DocStatus label="Documento ID" check={docIdCopy} />
-              <DocStatus label="Certificado EPS" check={docEpsCert} />
-              <DocStatus label="Consentimiento" check={docConsent} />
+              <DocStatus
+                label="Documento ID"
+                check={documentos.some(d => d.tipo_documento === 'identidad')}
+              />
+              <DocStatus
+                label="Certificado EPS"
+                check={documentos.some(d => d.tipo_documento === 'eps')}
+              />
+              <DocStatus
+                label="Consentimiento"
+                check={documentos.some(d => d.tipo_documento === 'consentimiento')}
+              />
             </div>
           </div>
         </div>

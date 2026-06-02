@@ -65,7 +65,9 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     ipsId: null as number | null, ipsOther: '', bloodType: '',
     hasDisability: 'No', disabilityDetails: '',
     hasAllergy: 'No', allergyDetails: '',
+    hasDiagnosis: 'No', diagnosisDetails: '',
     hasMedication: 'No', medicationDetails: '',
+    hasTreatment: 'No', treatmentDetails: '',
     // Step 4 - Entorno Familiar y Socioeconómico
     familyComposition: '', familyCount: '', familyIncome: '',
     isConflictVictim: 'No', isRUV: 'No',
@@ -662,12 +664,30 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 )}
               </div>
               <div className="form-group">
-                <label className="form-label">¿TOMA ALGÚN MEDICAMENTO O TIENE TRATAMIENTO MÉDICO?</label>
+                <label className="form-label">¿TIENE ALGÚN DIAGNÓSTICO MÉDICO?</label>
+                <select name="hasDiagnosis" value={formData.hasDiagnosis} onChange={handleChange} className="form-select">
+                  <option value="No">No</option><option value="Si">Sí</option>
+                </select>
+                {formData.hasDiagnosis === 'Si' && (
+                  <input name="diagnosisDetails" value={formData.diagnosisDetails} onChange={handleChange} className="form-input" placeholder="Ej. Diabetes tipo 1, hipertensión..." style={{ marginTop: '0.5rem' }} />
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">¿TOMA ALGÚN MEDICAMENTO?</label>
                 <select name="hasMedication" value={formData.hasMedication} onChange={handleChange} className="form-select">
                   <option value="No">No</option><option value="Si">Sí</option>
                 </select>
                 {formData.hasMedication === 'Si' && (
-                  <input name="medicationDetails" value={formData.medicationDetails} onChange={handleChange} className="form-input" placeholder="¿Cuál?" style={{ marginTop: '0.5rem' }} />
+                  <input name="medicationDetails" value={formData.medicationDetails} onChange={handleChange} className="form-input" placeholder="Nombre del medicamento y frecuencia..." style={{ marginTop: '0.5rem' }} />
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">¿TIENE ALGÚN TRATAMIENTO MÉDICO EN CURSO?</label>
+                <select name="hasTreatment" value={formData.hasTreatment} onChange={handleChange} className="form-select">
+                  <option value="No">No</option><option value="Si">Sí</option>
+                </select>
+                {formData.hasTreatment === 'Si' && (
+                  <input name="treatmentDetails" value={formData.treatmentDetails} onChange={handleChange} className="form-input" placeholder="Describe el tratamiento..." style={{ marginTop: '0.5rem' }} />
                 )}
               </div>
             </>

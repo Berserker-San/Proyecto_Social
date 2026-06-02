@@ -104,3 +104,18 @@ export async function desvincularAcudiente(relacionId: number) {
 
   if (error) throw error;
 }
+
+/**
+ * Marca o desmarca la autorización firmada de un acudiente.
+ */
+export async function toggleAutorizacion(
+  acudienteId: number,
+  firmada: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('acudiente')
+    .update({ tiene_autorizacion_firmada: firmada })
+    .eq('id', acudienteId);
+
+  if (error) throw error;
+}
