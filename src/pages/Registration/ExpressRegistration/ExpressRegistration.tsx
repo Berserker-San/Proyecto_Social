@@ -300,6 +300,7 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
                   <option value="">Seleccionar...</option>
                   <option value="Masculino">Masculino</option>
                   <option value="Femenino">Femenino</option>
+                  <option value="Intersexual">Intersexual</option>
                 </select>
               </div>
               <div>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
 import { getValienteById, calcularEdad, getHistorialValiente } from '../../lib/services/valientes.service';
+import { formatComuna } from '../../lib/services/catalogos.service';
 import {
   getAcompanamientosByValiente,
   crearAcompanamiento,
@@ -714,9 +715,9 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 label="Comuna"
                 value={
                   (valiente.ubicacion as any)?.comuna?.nombre
-                    ? `${(valiente.ubicacion as any).comuna.nombre}`
+                    ? formatComuna((valiente.ubicacion as any).comuna.nombre)
                     : valiente.ubicacion?.comuna_id
-                    ? `${valiente.ubicacion.comuna_id}`
+                    ? `Comuna ${valiente.ubicacion.comuna_id}`
                     : null
                 }
               />

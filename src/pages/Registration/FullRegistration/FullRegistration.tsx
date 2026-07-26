@@ -6,8 +6,8 @@ import {
 import '../ExpressRegistration/ExpressRegistration.css';
 import './FullRegistration.css';
 import { registrarValienteCompleto, subirDocumentoValiente } from '../../../lib/services/valientes.service';
-import { getEPS, getCiudades, getComunas, getInstitucionesEducativas, getPaises, getIPS } from '../../../lib/services/catalogos.service';
-import type { EPS, Ciudad, Comuna, InstitucionEducativa, Pais, IPS } from '../../../types/database.types';
+import { getEPS, getCiudades, getComunas, getBarrios, formatComuna, getInstitucionesEducativas, getPaises, getIPS } from '../../../lib/services/catalogos.service';
+import type { EPS, Ciudad, Comuna, Barrio, InstitucionEducativa, Pais, IPS } from '../../../types/database.types';
 
 interface FullRegistrationProps {
   context: 'TRIBU' | 'SOROCA';
@@ -27,6 +27,7 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
   const [ipsList, setIpsList] = useState<IPS[]>([]);
   const [ciudadesList, setCiudadesList] = useState<Ciudad[]>([]);
   const [comunasList, setComunasList] = useState<Comuna[]>([]);
+  const [barriosList, setBarriosList] = useState<Barrio[]>([]);
   const [institucionesList, setInstitucionesList] = useState<InstitucionEducativa[]>([]);
   const [paisesList, setPaisesList] = useState<Pais[]>([]);
 
@@ -55,7 +56,8 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     birthDate: '', birthPlaceCityId: null as number | null, birthPlaceOther: '', birthPlaceCityName: '',
     nationality: 'Colombiana', paisId: null as number | null, nationalityOther: '',
     phone: '', email: '', linkage: '',
-    address: '', neighborhood: '', cityId: null as number | null, communeId: null as number | null,
+    address: '', neighborhood: '', neighborhoodId: null as number | null, neighborhoodOther: '',
+    cityId: null as number | null, communeId: null as number | null,
     stratum: '',
     occupation: '', educationLevel: '', grade: '', schoolId: null as number | null, schoolName: '', schoolOther: '',
     favSubject: '', hardSubject: '', responsibilities: '', hobbies: '',
@@ -355,7 +357,7 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 <div>
                   <label className="form-label">SEXO BIOLÓGICO</label>
                   <select name="sex" value={formData.sex} onChange={handleChange} required className="form-select">
-                    <option value="">Seleccionar...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option>
+                    <option value="">Seleccionar...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option><option value="Intersexual">Intersexual</option>
                   </select>
                 </div>
                 <div>
@@ -460,50 +462,107 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
               <p className="wizard-section-subtitle">Ubicación</p>
               <div className="form-grid-2">
                 <div>
-                  <label className="form-label">CIUDAD</label>
+                  <label className="form-label">CIUDAD / MUNICIPIO</label>
                   <select
                     value={formData.cityId ?? ''}
                     onChange={e => {
                       const id = e.target.value ? Number(e.target.value) : null;
-                      setFormData(prev => ({ ...prev, cityId: id, communeId: null }));
-                      if (id) getComunas(id).then(setComunasList).catch(console.error);
-                      else setComunasList([]);
+                      setFormData(prev => ({
+                        ...prev,
+                        cityId: id,
+                        communeId: null,
+                        neighborhoodId: null,
+                        neighborhoodOther: '',
+                        neighborhood: '',
+                      }));
+                      setComunasList([]);
+                      setBarriosList([]);
+                      if (id) {
+                        getComunas(id).then(setComunasList).catch(console.error);
+                        getBarrios(id).then(setBarriosList).catch(console.error);
+                      }
                     }}
                     className="form-select"
                   >
                     <option value="">Seleccionar...</option>
                     {ciudadesList.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}{c.departamento ? ` — ${c.departamento}` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>
-                <div><label className="form-label">BARRIO / CORREGIMIENTO</label><input name="neighborhood" value={formData.neighborhood} onChange={handleChange} className="form-input" /></div>
-              </div>
-              <div className="form-grid-2">
                 <div>
-                  <label className="form-label">COMUNA</label>
+                  <label className="form-label">BARRIO / CORREGIMIENTO</label>
                   <select
-                    value={formData.communeId ?? ''}
-                    onChange={e => setFormData(prev => ({
-                      ...prev,
-                      communeId: e.target.value ? Number(e.target.value) : null,
-                    }))}
+                    value={formData.neighborhoodId === null ? (formData.neighborhood ? 'otro' : '') : String(formData.neighborhoodId)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'otro' || val === '') {
+                        setFormData(prev => ({ ...prev, neighborhoodId: null, neighborhood: '', neighborhoodOther: val === 'otro' ? prev.neighborhoodOther : '' }));
+                      } else {
+                        const found = barriosList.find(b => b.id === Number(val));
+                        setFormData(prev => ({ ...prev, neighborhoodId: Number(val), neighborhood: found?.nombre ?? '', neighborhoodOther: '' }));
+                      }
+                    }}
                     className="form-select"
                     disabled={!formData.cityId}
                   >
                     <option value="">{formData.cityId ? 'Seleccionar...' : 'Primero selecciona ciudad'}</option>
-                    {comunasList.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    {barriosList.map(b => (
+                      <option key={b.id} value={b.id}>{b.nombre}</option>
                     ))}
+                    <option value="otro">Otro (escribir)</option>
                   </select>
-                </div>
-                <div>
-                  <label className="form-label">ESTRATO</label>
-                  <select name="stratum" value={formData.stratum} onChange={handleChange} className="form-select">
-                    <option value="">-</option>{['1','2','3','4','5','6'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  {(formData.neighborhoodId === null && formData.cityId) && (
+                    <input
+                      name="neighborhoodOther"
+                      value={formData.neighborhoodOther}
+                      onChange={e => setFormData(prev => ({ ...prev, neighborhoodOther: e.target.value, neighborhood: e.target.value }))}
+                      className="form-input"
+                      placeholder="Escribe el barrio o corregimiento..."
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                  )}
                 </div>
               </div>
+              {/* Comuna: solo visible si la ciudad seleccionada tiene comunas en el catálogo */}
+              {comunasList.length > 0 && (
+                <div className="form-grid-2">
+                  <div>
+                    <label className="form-label">COMUNA</label>
+                    <select
+                      value={formData.communeId ?? ''}
+                      onChange={e => setFormData(prev => ({
+                        ...prev,
+                        communeId: e.target.value ? Number(e.target.value) : null,
+                      }))}
+                      className="form-select"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {comunasList.map(c => (
+                        <option key={c.id} value={c.id}>{formatComuna(c.nombre)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">ESTRATO</label>
+                    <select name="stratum" value={formData.stratum} onChange={handleChange} className="form-select">
+                      <option value="">-</option>{['1','2','3','4','5','6'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {comunasList.length === 0 && (
+                <div className="form-grid-2">
+                  <div>
+                    <label className="form-label">ESTRATO</label>
+                    <select name="stratum" value={formData.stratum} onChange={handleChange} className="form-select">
+                      <option value="">-</option>{['1','2','3','4','5','6'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
               <div className="form-group"><label className="form-label">DIRECCIÓN DE RESIDENCIA</label><input name="address" value={formData.address} onChange={handleChange} className="form-input" placeholder="Calle / Carrera..." /></div>
 
               {/* Sección 2: Escolaridad y Ocupación */}

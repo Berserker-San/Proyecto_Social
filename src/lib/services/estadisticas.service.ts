@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { calcularEdad } from './valientes.service';
+import { formatComuna } from './catalogos.service';
 
 // =========================================================
 // TIPOS DE RETORNO
@@ -317,6 +318,7 @@ export async function getEstadisticasPorComuna(): Promise<EstadisticaComuna[]> {
     .from('valiente_ubicacion')
     .select(`
       comuna_id,
+      comuna:comuna ( nombre ),
       valiente!inner ( estado )
     `)
     .eq('valiente.estado', 'ACTIVO');
@@ -326,13 +328,29 @@ export async function getEstadisticasPorComuna(): Promise<EstadisticaComuna[]> {
   const conteo: Record<string, number> = {};
 
   for (const row of data ?? []) {
-    const comuna = row.comuna_id ? String(row.comuna_id) : 'No registrada';
-    conteo[comuna] = (conteo[comuna] ?? 0) + 1;
+    let label: string;
+    const comunaNombre = (row as any)?.comuna?.nombre as string | undefined;
+    if (comunaNombre) {
+      label = formatComuna(comunaNombre);
+    } else if (row.comuna_id) {
+      label = `Comuna ${row.comuna_id}`;
+    } else {
+      label = 'No registrada';
+    }
+    conteo[label] = (conteo[label] ?? 0) + 1;
   }
 
+  // Ordenar numéricamente por número de comuna; "No registrada" al final
   return Object.entries(conteo)
     .map(([comuna, total]) => ({ comuna, total }))
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => {
+      const na = parseInt(a.comuna.replace(/\D/g, ''), 10);
+      const nb = parseInt(b.comuna.replace(/\D/g, ''), 10);
+      if (isNaN(na) && isNaN(nb)) return 0;
+      if (isNaN(na)) return 1;
+      if (isNaN(nb)) return -1;
+      return na - nb;
+    });
 }
 
 // =========================================================

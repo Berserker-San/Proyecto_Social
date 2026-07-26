@@ -420,6 +420,7 @@ export const TIPO_DOCUMENTO = {
 export const SEXO = {
   MASCULINO: 'Masculino',
   FEMENINO: 'Femenino',
+  INTERSEXUAL: 'Intersexual',
 } as const;
 
 export const ESTADO_VALIENTE = {
