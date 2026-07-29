@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, X, Download, Info } from 'lucide-react';
-import { parseCSV, generateCSVTemplate } from '../../lib/csv/csvParser';
+import { parseCSV, generateExcelTemplate } from '../../lib/csv/csvParser';
 import { insertValientesBatch } from '../../lib/services/csvUpload.service';
 import type { UploadReport } from '../../lib/services/csvUpload.service';
 import type { RowError } from '../../lib/csv/csvParser';
@@ -86,11 +86,11 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onBack }) => {
   };
 
   const handleDescargarPlantilla = () => {
-    const blob = generateCSVTemplate();
+    const blob = generateExcelTemplate();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'plantilla-valientes.csv';
+    link.download = 'plantilla-valientes.xlsx';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -112,8 +112,8 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onBack }) => {
         <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <Info size={20} className="text-blue-600 mt-0.5 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-blue-900">Descarga la plantilla CSV</p>
-            <p className="text-xs text-blue-700 mt-1">Contiene todas las columnas requeridas para cargar valientes masivamente.</p>
+            <p className="text-sm font-semibold text-blue-900">Descarga la plantilla Excel</p>
+            <p className="text-xs text-blue-700 mt-1">Archivo .xlsx con todas las columnas requeridas para cargar valientes masivamente.</p>
           </div>
           <button
             onClick={handleDescargarPlantilla}

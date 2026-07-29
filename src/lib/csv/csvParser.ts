@@ -13,6 +13,7 @@ import type {
   Acudiente,
 } from '../../types/database.types';
 import { csvColumnIngresoMensual } from '../config/smmlv';
+import * as XLSX from 'xlsx';
 
 // =========================================================
 // TIPOS EXPORTADOS
@@ -424,12 +425,35 @@ function getColumnValueAfter(
 // PARSER PRINCIPAL
 // =========================================================
 
+/**
+ * Genera la plantilla de importación como archivo Excel (.xlsx).
+ * Para columnas con múltiples alias usa siempre el nombre principal (primero).
+ * La primera fila tiene los encabezados; la segunda está vacía como guía.
+ */
+export function generateExcelTemplate(): Blob {
+  const headers = Object.values(CSV_COLUMNS).map(col =>
+    Array.isArray(col) ? col[0] : col
+  );
+
+  // Hoja con fila de encabezados + fila vacía de ejemplo
+  const ws = XLSX.utils.aoa_to_sheet([headers, headers.map(() => '')]);
+
+  // Ancho automático basado en la longitud del encabezado (máx 60 chars)
+  ws['!cols'] = headers.map(h => ({ wch: Math.min(h.length + 2, 60) }));
+
+  // Estilo de encabezado — negrita (solo funciona con xlsx-style; aquí es informativo)
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Valientes');
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([wbout], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+/** @deprecated Usar generateExcelTemplate() — esta función queda por compatibilidad con código existente */
 export function generateCSVTemplate(): Blob {
-  const headers = Object.values(CSV_COLUMNS).flat();
-  const headerRow = headers.map(h => `"${h}"`).join(',');
-  const emptyRow = headers.map(() => '').join(',');
-  const csv = `${headerRow}\n${emptyRow}`;
-  return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  return generateExcelTemplate();
 }
 
 export function parseCSV(text: string): ParseResult {
