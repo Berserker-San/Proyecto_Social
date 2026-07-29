@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { calcularEdad } from './valientes.service';
 import { formatComuna } from './catalogos.service';
+import { ORDEN_RANGOS_INGRESO } from '../config/smmlv';
 
 // =========================================================
 // TIPOS DE RETORNO
@@ -475,7 +476,7 @@ export async function getEstadisticasIngresos(): Promise<EstadisticaIngreso[]> {
     conteo[key] = (conteo[key] ?? 0) + 1;
   }
 
-  const ORDER = ['Menos de 1 SMMLV', '1 SMMLV', '2 SMMLV', 'Más de 2 SMMLV'];
+  const ORDER = ORDEN_RANGOS_INGRESO;
 
   return Object.entries(conteo)
     .map(([rango, total]) => ({ rango, total }))

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { serializeMedicamentos } from '../../types/database.types';
 import type {
   Valiente,
   ValienteCompleto,
@@ -346,6 +347,7 @@ export interface DatosRegistroCompleto {
   // Salud
   epsId: number | null;
   epsOther: string;
+  epsRegimen: string;   // 'CONTRIBUTIVO' | 'SUBSIDIADO' | 'ESPECIAL' | ''
   ipsId: number | null;
   ipsOther: string;
   bloodType: string;
@@ -354,7 +356,7 @@ export interface DatosRegistroCompleto {
   hasAllergy: string;
   allergyDetails: string;
   hasMedication: string;
-  medicationDetails: string;
+  medications: import('../../types/database.types').Medicamento[];  // array dinámico
   hasTreatment: string;
   treatmentDetails: string;
   hasDiagnosis: string;
@@ -456,6 +458,7 @@ export async function registrarValienteCompleto(
   const salud = {
     valiente_id: valienteId,
     eps_id: epsId,
+    regimen_eps: cleanText(datos.epsRegimen) || null,
     ips_id: ipsId,
     tipo_sangre: cleanText(datos.bloodType),
     tiene_discapacidad: isYes(datos.hasDisability),
@@ -463,7 +466,9 @@ export async function registrarValienteCompleto(
     diagnostico_medico: isYes(datos.hasDiagnosis) ? cleanText(datos.diagnosisDetails) : null,
     tiene_alergias: isYes(datos.hasAllergy),
     alergias: isYes(datos.hasAllergy) ? cleanText(datos.allergyDetails) : null,
-    medicamentos_actuales: isYes(datos.hasMedication) ? cleanText(datos.medicationDetails) : null,
+    medicamentos_actuales: isYes(datos.hasMedication)
+      ? (serializeMedicamentos(datos.medications) ?? null)
+      : null,
     tratamiento_en_curso: isYes(datos.hasTreatment) ? cleanText(datos.treatmentDetails) : null,
     contacto_emergencia_nombre: null,
     contacto_emergencia_telefono: null,

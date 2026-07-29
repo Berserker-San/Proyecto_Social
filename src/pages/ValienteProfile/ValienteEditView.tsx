@@ -9,8 +9,10 @@ import {
   guardarContextoFamiliar, guardarPerfilDeportivo, guardarPerfilSoroca,
 } from '../../lib/services/perfiles.service';
 import { getCiudades, getComunas, getBarrios, formatComuna } from '../../lib/services/catalogos.service';
+import { parseMedicamentos, serializeMedicamentos } from '../../types/database.types';
+import { getRangosIngreso } from '../../lib/config/smmlv';
 import { supabase } from '../../lib/supabase';
-import type { ValienteCompleto, Ciudad, Comuna, Barrio } from '../../types/database.types';
+import type { ValienteCompleto, Ciudad, Comuna, Barrio, Medicamento } from '../../types/database.types';
 
 // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -99,6 +101,7 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
     tipo_sangre: '', tiene_alergias: 'false', alergias: '',
     tiene_discapacidad: 'false', tipo_discapacidad: '',
     diagnostico_medico: '', medicamentos_actuales: '', tratamiento_en_curso: '',
+    regimen_eps: '',
   });
 
   const [educacion, setEducacion] = useState({
@@ -118,6 +121,11 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
   const [ciudadesCat, setCiudadesCat] = useState<Ciudad[]>([]);
   const [comunasCat,  setComunasCat]  = useState<Comuna[]>([]);
   const [barriosCat,  setBarriosCat]  = useState<Barrio[]>([]);
+
+  // Lista dinámica de medicamentos
+  const EMPTY_MED: Medicamento = { nombre: '', dosis: '', frecuencia: '' };
+  const [meds, setMeds] = useState<Medicamento[]>([]);
+  const [hasMedEdit, setHasMedEdit] = useState(false); // toggle "toma medicamentos"
 
   const [contextoFamiliar, setContextoFamiliar] = useState({
     composicion_familiar: '', numero_personas_hogar: '',
@@ -179,7 +187,12 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
           diagnostico_medico:    data.salud?.diagnostico_medico ?? '',
           medicamentos_actuales: data.salud?.medicamentos_actuales ?? '',
           tratamiento_en_curso:  data.salud?.tratamiento_en_curso ?? '',
+          regimen_eps:           data.salud?.regimen_eps ?? '',
         });
+        // Cargar medicamentos — parseMedicamentos maneja texto legado y JSON
+        const medsLoaded = parseMedicamentos(data.salud?.medicamentos_actuales);
+        setMeds(medsLoaded.length > 0 ? medsLoaded : []);
+        setHasMedEdit(medsLoaded.length > 0);
         setEducacion({
           nivel_educativo:  data.educacion?.nivel_educativo ?? '',
           grado_actual:     data.educacion?.grado_actual ?? '',
@@ -374,14 +387,17 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
       await guardarSalud({
         valiente_id: valienteId,
         eps_id: valiente.salud?.eps_id ?? null,
+        eps_nombre: valiente.salud?.eps_nombre ?? null,
+        regimen_eps: salud.regimen_eps || null,
         ips_id: valiente.salud?.ips_id ?? null,
+        ips_nombre: valiente.salud?.ips_nombre ?? null,
         tipo_sangre: salud.tipo_sangre || null,
         tiene_alergias: salud.tiene_alergias === 'true',
         alergias: salud.alergias || null,
         tiene_discapacidad: salud.tiene_discapacidad === 'true',
         tipo_discapacidad: salud.tipo_discapacidad || null,
         diagnostico_medico: salud.diagnostico_medico || null,
-        medicamentos_actuales: salud.medicamentos_actuales || null,
+        medicamentos_actuales: serializeMedicamentos(meds),
         tratamiento_en_curso: salud.tratamiento_en_curso || null,
       } as any);
 
@@ -543,6 +559,12 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
       {/* ── TAB: SALUD ── */}
       {activeTab === 'health' && (
         <Section title="Salud y Bienestar">
+          <Field label="Régimen de EPS" name="regimen_eps" value={salud.regimen_eps} onChange={ch(setSalud)}
+            options={[
+              { value: 'CONTRIBUTIVO', label: 'Contributivo' },
+              { value: 'SUBSIDIADO',   label: 'Subsidiado'   },
+              { value: 'ESPECIAL',     label: 'Especial'     },
+            ]} />
           <Field label="Tipo de Sangre" name="tipo_sangre" value={salud.tipo_sangre} onChange={ch(setSalud)}
             options={['O+','O-','A+','A-','B+','B-','AB+','AB-'].map(t => ({value:t,label:t}))} />
           <Field label="Tiene Discapacidad" name="tiene_discapacidad" value={salud.tiene_discapacidad} onChange={ch(setSalud)}
@@ -556,7 +578,66 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
             <Field label="Cuales alergias" name="alergias" value={salud.alergias} onChange={ch(setSalud)} />
           )}
           <Field label="Diagnostico Medico"    name="diagnostico_medico"    value={salud.diagnostico_medico}    onChange={ch(setSalud)} full rows={2} />
-          <Field label="Medicamentos Actuales" name="medicamentos_actuales" value={salud.medicamentos_actuales} onChange={ch(setSalud)} full rows={2} />
+          {/* Medicamentos — lista dinámica */}
+          <div className="md:col-span-2">
+            <label className="text-xs text-slate-500 font-semibold mb-1 block uppercase tracking-wide">
+              ¿Toma algún medicamento?
+            </label>
+            <select
+              value={hasMedEdit ? 'Si' : 'No'}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === 'No' && meds.some(m => m.nombre.trim())) {
+                  if (!window.confirm('¿Seguro que deseas quitar los medicamentos registrados?')) return;
+                  setMeds([]);
+                }
+                setHasMedEdit(val === 'Si');
+                if (val === 'Si' && meds.length === 0) setMeds([EMPTY_MED]);
+              }}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+            >
+              <option value="No">No</option>
+              <option value="Si">Sí</option>
+            </select>
+            {hasMedEdit && (
+              <div style={{ marginTop: '0.75rem' }}>
+                {meds.map((med, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                      placeholder="Nombre del medicamento"
+                      value={med.nombre}
+                      onChange={e => setMeds(prev => prev.map((m, j) => j === i ? { ...m, nombre: e.target.value } : m))}
+                    />
+                    <input
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                      placeholder="Dosis / concentración"
+                      value={med.dosis}
+                      onChange={e => setMeds(prev => prev.map((m, j) => j === i ? { ...m, dosis: e.target.value } : m))}
+                    />
+                    <input
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                      placeholder="Frecuencia (ej. cada 8h)"
+                      value={med.frecuencia}
+                      onChange={e => setMeds(prev => prev.map((m, j) => j === i ? { ...m, frecuencia: e.target.value } : m))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMeds(prev => prev.length === 1 ? [EMPTY_MED] : prev.filter((_, j) => j !== i))}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '1.1rem', padding: '0 0.25rem' }}
+                      title="Quitar medicamento"
+                    >✕</button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setMeds(prev => [...prev, EMPTY_MED])}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                  style={{ borderStyle: 'dashed', cursor: 'pointer', marginTop: '0.25rem' }}
+                >+ Agregar medicamento</button>
+              </div>
+            )}
+          </div>
           <Field label="Tratamiento en Curso"  name="tratamiento_en_curso"  value={salud.tratamiento_en_curso}  onChange={ch(setSalud)} full rows={2} />
         </Section>
       )}
@@ -645,7 +726,7 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
             <Field label="Composicion Familiar"      name="composicion_familiar"  value={contextoFamiliar.composicion_familiar}  onChange={ch(setContextoFamiliar)} full rows={2} />
             <Field label="Personas en el Hogar"      name="numero_personas_hogar" value={contextoFamiliar.numero_personas_hogar} onChange={ch(setContextoFamiliar)} type="number" />
             <Field label="Ingreso Mensual del Hogar" name="ingreso_mensual_hogar" value={contextoFamiliar.ingreso_mensual_hogar} onChange={ch(setContextoFamiliar)}
-              options={['Menos de 1 SMMLV','1 SMMLV','2 SMMLV','Más de 2 SMMLV'].map(v => ({value:v,label:v}))} />
+              options={getRangosIngreso().map(r => ({ value: r.value, label: r.label }))} />
             <Field label="Etnia" name="etnia" value={contextoFamiliar.etnia} onChange={ch(setContextoFamiliar)}
               options={['Mestizo','Afrocolombiano','Indigena','Raizal','Otro'].map(v => ({value:v,label:v}))} />
             <Field label="Victima del Conflicto" name="es_victima_conflicto" value={contextoFamiliar.es_victima_conflicto} onChange={ch(setContextoFamiliar)}

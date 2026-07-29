@@ -8,6 +8,7 @@ import {
 import { SorocaIcon, TribuIcon } from '../../components/customIcons/customIcons';
 import { getValienteById, calcularEdad, getHistorialValiente } from '../../lib/services/valientes.service';
 import { formatComuna } from '../../lib/services/catalogos.service';
+import { parseMedicamentos } from '../../types/database.types';
 import {
   getAcompanamientosByValiente,
   crearAcompanamiento,
@@ -677,6 +678,15 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
           {activeTab === 'health' && (
             <Section title="Salud">
               <GridItem label="EPS" value={(valiente.salud as any)?.eps?.nombre ?? (valiente.salud?.eps_id ? `EPS #${valiente.salud.eps_id}` : null)} />
+              <GridItem
+                label="Régimen de EPS"
+                value={
+                  valiente.salud?.regimen_eps === 'CONTRIBUTIVO' ? 'Contributivo'
+                  : valiente.salud?.regimen_eps === 'SUBSIDIADO' ? 'Subsidiado'
+                  : valiente.salud?.regimen_eps === 'ESPECIAL'   ? 'Especial'
+                  : null
+                }
+              />
               <GridItem label="Tipo de Sangre" value={valiente.salud?.tipo_sangre} />
               <GridItem
                 label="Alergias"
@@ -691,7 +701,25 @@ const ValienteProfileView: React.FC<ValienteProfileViewProps> = ({
                 }
               />
               <GridItem label="Diagnóstico Médico" value={valiente.salud?.diagnostico_medico} full />
-              <GridItem label="Medicamentos Actuales" value={valiente.salud?.medicamentos_actuales} full />
+              {/* Medicamentos — lista estructurada con fallback para texto legado */}
+              {(() => {
+                const mList = parseMedicamentos(valiente.salud?.medicamentos_actuales);
+                if (mList.length === 0) return null;
+                return (
+                  <div className="md:col-span-2">
+                    <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Medicamentos</p>
+                    <div className="space-y-1">
+                      {mList.map((m, i) => (
+                        <div key={i} className="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                          <span className="font-medium">{m.nombre || '—'}</span>
+                          {m.dosis     && <span className="text-slate-500"> · {m.dosis}</span>}
+                          {m.frecuencia && <span className="text-slate-500"> · {m.frecuencia}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <GridItem label="Tratamiento en Curso" value={valiente.salud?.tratamiento_en_curso} full />
             </Section>
           )}

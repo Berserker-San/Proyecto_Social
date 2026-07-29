@@ -12,6 +12,7 @@ import type {
   ValienteContextoFamiliar,
   Acudiente,
 } from '../../types/database.types';
+import { csvColumnIngresoMensual } from '../config/smmlv';
 
 // =========================================================
 // TIPOS EXPORTADOS
@@ -155,8 +156,6 @@ export const CSV_COLUMNS = {
   colegioOtra: 'Si tu respuesta anterior fue otra, indica cuál colegio:',
   programaPregrado: 'En el caso de que estés cursando un programa de pregrado universitario o programa técnico o tecnológico ¿cuál?',
   institucionEducativa: 'En el caso de que estés cursando un programa de pregrado universitario o programa técnico o tecnológico ¿En qué institución educativa?',
-  materiaFavorita: '¿Qué temática o curso del colegio o institución universitaria disfrutas más?',
-  materiaDificil: '¿Qué temática o curso del colegio o institución universitaria es más difícil para ti?',
   responsabilidadEspecial: '¿Tienes alguna responsabilidad especial diferente al estudio?',
   organizaciones: '¿Perteneces a alguna organización, equipos o clubes dentro y fuera de la Institución educativa? (diferente a Soroca) ¿Cuáles?',
   hobbies: '¿Qué te gusta hacer en tu tiempo libre? (además de pasar tiempo con tus amistades)',
@@ -180,7 +179,7 @@ export const CSV_COLUMNS = {
 
   composicionFamiliar: 'Composición familiar (¿Con quiénes vives en tu casa?)',
   numeroPersonasHogar: '¿Cuántas personas viven en tu casa? incluyéndote',
-  ingresoMensualHogar: 'Ingresos Familiares mensuales   (salario mínimo vigente a 2025 $1.423.000)',
+  ingresoMensualHogar: csvColumnIngresoMensual(),
   victimaConflicto: '¿Fuiste víctima del conflicto armado?',
   inscritoRuv: '¿Te encuentras inscrito/a en el Registro Único de Víctimas?',
   etnia: '¿Con qué etnia te identificas?',
@@ -234,8 +233,15 @@ function mapTipoDocumento(raw: string): string {
   return 'CC';
 }
 
-function mapSexo(raw: string): string | null {
-  const v = raw.trim();
+function mapRegimenEps(raw: string): string | null {
+  const v = raw.trim().toLowerCase();
+  if (v === 'contributivo') return 'CONTRIBUTIVO';
+  if (v === 'subsidiado')   return 'SUBSIDIADO';
+  if (v === 'especial')     return 'ESPECIAL';
+  return null;
+}
+
+function mapSexo(raw: string): string | null {  const v = raw.trim();
   if (v === 'Masculino') return 'MASCULINO';
   if (v === 'Femenino') return 'FEMENINO';
   if (v === 'Intersexual') return 'INTERSEXUAL';
@@ -564,6 +570,7 @@ export function parseCSV(text: string): ParseResult {
 
     const salud: SaludCSVRow = {
       eps_nombre:                     epsNombre || null,
+      regimen_eps:                    mapRegimenEps(h(CSV_COLUMNS.regimenAfiliacion)),
       ips_nombre:                     h(CSV_COLUMNS.ipsUrgencias) || null,
       tipo_sangre:                    h(CSV_COLUMNS.tipoSangre) || null,
       tiene_discapacidad:             mapBool(h(CSV_COLUMNS.presentaDiscapacidad)),
@@ -571,7 +578,7 @@ export function parseCSV(text: string): ParseResult {
       diagnostico_medico:             h(CSV_COLUMNS.diagnostico) || null,
       tiene_alergias:                 mapBool(h(CSV_COLUMNS.tieneAlergia)),
       alergias:                       h(CSV_COLUMNS.alergias) || null,
-      medicamentos_actuales:          null,
+      medicamentos_actuales:          null,  // el CSV no tiene columnas separadas de medicamentos; usar tratamiento_en_curso para texto libre
       tratamiento_en_curso:           h(CSV_COLUMNS.tratamiento) || null,
       contacto_emergencia_nombre:     null,
       contacto_emergencia_telefono:   null,
@@ -597,8 +604,8 @@ export function parseCSV(text: string): ParseResult {
     const educacion: EducacionCSVRow = {
       nivel_educativo:    mapNivelEducativo(h(CSV_COLUMNS.nivelEducativo)),
       grado_actual:       gradoOPrograma || null,
-      materia_favorita:   h(CSV_COLUMNS.materiaFavorita) || null,
-      materia_dificil:    h(CSV_COLUMNS.materiaDificil) || null,
+      materia_favorita:   null,
+      materia_dificil:    null,
       institucion_nombre: institucionNombre,
     };
 

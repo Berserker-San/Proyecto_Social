@@ -7,7 +7,8 @@ import '../ExpressRegistration/ExpressRegistration.css';
 import './FullRegistration.css';
 import { registrarValienteCompleto, subirDocumentoValiente } from '../../../lib/services/valientes.service';
 import { getEPS, getCiudades, getComunas, getBarrios, formatComuna, getInstitucionesEducativas, getPaises, getIPS } from '../../../lib/services/catalogos.service';
-import type { EPS, Ciudad, Comuna, Barrio, InstitucionEducativa, Pais, IPS } from '../../../types/database.types';
+import type { EPS, Ciudad, Comuna, Barrio, InstitucionEducativa, Pais, IPS, Medicamento } from '../../../types/database.types';
+import { getRangosIngreso } from '../../../lib/config/smmlv';
 
 interface FullRegistrationProps {
   context: 'TRIBU' | 'SOROCA';
@@ -30,6 +31,9 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
   const [barriosList, setBarriosList] = useState<Barrio[]>([]);
   const [institucionesList, setInstitucionesList] = useState<InstitucionEducativa[]>([]);
   const [paisesList, setPaisesList] = useState<Pais[]>([]);
+  // Lista dinámica de medicamentos
+  const EMPTY_MED: Medicamento = { nombre: '', dosis: '', frecuencia: '' };
+  const [medications, setMedications] = useState<Medicamento[]>([EMPTY_MED]);
 
   useEffect(() => {
     Promise.all([
@@ -63,13 +67,12 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
     favSubject: '', hardSubject: '', responsibilities: '', hobbies: '',
     workPlace: '', workDescription: '',
     // Step 3 - Salud y Bienestar
-    epsId: null as number | null, epsOther: '',
+    epsId: null as number | null, epsOther: '', epsRegimen: '',
     ipsId: null as number | null, ipsOther: '', bloodType: '',
     hasDisability: 'No', disabilityDetails: '',
     hasAllergy: 'No', allergyDetails: '',
     hasDiagnosis: 'No', diagnosisDetails: '',
-    hasMedication: 'No', medicationDetails: '',
-    hasTreatment: 'No', treatmentDetails: '',
+    hasMedication: 'No', medicationDetails: '',    hasTreatment: 'No', treatmentDetails: '',
     // Step 4 - Entorno Familiar y Socioeconómico
     familyComposition: '', familyCount: '', familyIncome: '',
     isConflictVictim: 'No', isRUV: 'No',
@@ -132,7 +135,7 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
 
     try {
       // 1. Guardar datos del valiente
-      const { valiente, esNuevo } = await registrarValienteCompleto(formData);
+      const { valiente, esNuevo } = await registrarValienteCompleto({ ...formData, medications });
 
       // 2. Subir documentos al Storage
       await Promise.all([
@@ -698,6 +701,15 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                 </div>
               </div>
               <div className="form-group">
+                <label className="form-label">RÉGIMEN DE EPS</label>
+                <select name="epsRegimen" value={formData.epsRegimen} onChange={handleChange} className="form-select">
+                  <option value="">Seleccionar...</option>
+                  <option value="CONTRIBUTIVO">Contributivo</option>
+                  <option value="SUBSIDIADO">Subsidiado</option>
+                  <option value="ESPECIAL">Especial</option>
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label">TIPO DE SANGRE</label>
                 <select name="bloodType" value={formData.bloodType} onChange={handleChange} className="form-select">
                   <option value="">No sabe</option>
@@ -733,11 +745,61 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
               </div>
               <div className="form-group">
                 <label className="form-label">¿TOMA ALGÚN MEDICAMENTO?</label>
-                <select name="hasMedication" value={formData.hasMedication} onChange={handleChange} className="form-select">
-                  <option value="No">No</option><option value="Si">Sí</option>
+                <select
+                  name="hasMedication"
+                  value={formData.hasMedication}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === 'No' && medications.some(m => m.nombre.trim())) {
+                      if (!window.confirm('¿Seguro que deseas quitar los medicamentos registrados?')) return;
+                      setMedications([EMPTY_MED]);
+                    }
+                    handleChange(e);
+                  }}
+                  className="form-select"
+                >
+                  <option value="No">No</option>
+                  <option value="Si">Sí</option>
                 </select>
                 {formData.hasMedication === 'Si' && (
-                  <input name="medicationDetails" value={formData.medicationDetails} onChange={handleChange} className="form-input" placeholder="Nombre del medicamento y frecuencia..." style={{ marginTop: '0.5rem' }} />
+                  <div style={{ marginTop: '0.75rem' }}>
+                    {medications.map((med, i) => (
+                      <div key={i} className="form-grid-2" style={{ marginBottom: '0.5rem', alignItems: 'flex-end' }}>
+                        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            className="form-input"
+                            placeholder="Nombre del medicamento"
+                            value={med.nombre}
+                            onChange={e => setMedications(prev => prev.map((m, j) => j === i ? { ...m, nombre: e.target.value } : m))}
+                          />
+                          <input
+                            className="form-input"
+                            placeholder="Dosis / concentración"
+                            value={med.dosis}
+                            onChange={e => setMedications(prev => prev.map((m, j) => j === i ? { ...m, dosis: e.target.value } : m))}
+                          />
+                          <input
+                            className="form-input"
+                            placeholder="Frecuencia (ej. cada 8h)"
+                            value={med.frecuencia}
+                            onChange={e => setMedications(prev => prev.map((m, j) => j === i ? { ...m, frecuencia: e.target.value } : m))}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setMedications(prev => prev.length === 1 ? [EMPTY_MED] : prev.filter((_, j) => j !== i))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '1.1rem', padding: '0 0.25rem' }}
+                            title="Quitar medicamento"
+                          >✕</button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setMedications(prev => [...prev, EMPTY_MED])}
+                      className="form-input"
+                      style={{ width: 'auto', background: '#f1f5f9', border: '1px dashed #94a3b8', cursor: 'pointer', marginTop: '0.25rem' }}
+                    >+ Agregar medicamento</button>
+                  </div>
                 )}
               </div>
               <div className="form-group">
@@ -764,10 +826,9 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                   <label className="form-label">INGRESOS TOTALES POR FAMILIA</label>
                   <select name="familyIncome" value={formData.familyIncome} onChange={handleChange} className="form-select">
                     <option value="">Seleccionar...</option>
-                    <option value="Menos de 1 SMMLV">Menos de 1 SMMLV</option>
-                    <option value="1 SMMLV">1 SMMLV</option>
-                    <option value="2 SMMLV">2 SMMLV</option>
-                    <option value="Más de 2 SMMLV">Más de 2 SMMLV</option>
+                    {getRangosIngreso().map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
