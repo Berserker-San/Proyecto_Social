@@ -320,11 +320,13 @@ export interface DatosRegistroCompleto {
   paisId: number | null;
   nationalityOther: string;
   phone: string;
-  email: string;
+  email?: string;   // opcional — se guarda NULL si está vacío
   linkage: string;
   // Residencia
   address: string;
   neighborhood: string;
+  neighborhoodId: number | null;    // FK a tabla barrio (null si se usó texto libre)
+  neighborhoodOther: string;        // texto libre cuando no está en catálogo
   cityId: number | null;
   communeId: number | null;
   stratum: string;
@@ -371,7 +373,7 @@ export interface DatosRegistroCompleto {
   guardianFullName: string;
   guardianKinship: string;
   guardianPhone: string;
-  guardianEmail: string;
+  guardianEmail?: string;  // opcional — se guarda NULL si está vacío
   guardianWorks: string;
   // Deportivo
   shirtSize: string;
@@ -438,6 +440,7 @@ export async function registrarValienteCompleto(
     direccion: cleanText(datos.address),
     ciudad_id: getValidCatalogId(datos.cityId),
     comuna_id: getValidCatalogId(datos.communeId),
+    barrio_id: getValidCatalogId(datos.neighborhoodId ?? null),
     estrato: cleanText(datos.stratum),
     latitud: null,
     longitud: null,

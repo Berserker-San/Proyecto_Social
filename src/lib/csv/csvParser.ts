@@ -238,6 +238,7 @@ function mapSexo(raw: string): string | null {
   const v = raw.trim();
   if (v === 'Masculino') return 'MASCULINO';
   if (v === 'Femenino') return 'FEMENINO';
+  if (v === 'Intersexual') return 'INTERSEXUAL';
   return null;
 }
 

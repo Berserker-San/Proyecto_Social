@@ -8,8 +8,9 @@ import {
   guardarSalud, guardarEducacion, guardarUbicacion,
   guardarContextoFamiliar, guardarPerfilDeportivo, guardarPerfilSoroca,
 } from '../../lib/services/perfiles.service';
+import { getCiudades, getComunas, getBarrios, formatComuna } from '../../lib/services/catalogos.service';
 import { supabase } from '../../lib/supabase';
-import type { ValienteCompleto } from '../../types/database.types';
+import type { ValienteCompleto, Ciudad, Comuna, Barrio } from '../../types/database.types';
 
 // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,19 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
     nivel_educativo: '', grado_actual: '', materia_favorita: '', materia_dificil: '',
   });
 
-  const [ubicacion, setUbicacion] = useState({ direccion: '', estrato: '' });
+  const [ubicacion, setUbicacion] = useState({
+    direccion: '',
+    estrato: '',
+    ciudad_id: '' as string,   // '' = sin seleccionar
+    comuna_id: '' as string,
+    barrio_id: '' as string,
+    barrio_otro: '',           // texto libre cuando barrio_id === 'otro'
+  });
+
+  // Catálogos para ubicación
+  const [ciudadesCat, setCiudadesCat] = useState<Ciudad[]>([]);
+  const [comunasCat,  setComunasCat]  = useState<Comuna[]>([]);
+  const [barriosCat,  setBarriosCat]  = useState<Barrio[]>([]);
 
   const [contextoFamiliar, setContextoFamiliar] = useState({
     composicion_familiar: '', numero_personas_hogar: '',
@@ -133,6 +146,11 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
   const [savingEdit, setSavingEdit]         = useState(false);
 
   // ── Carga inicial ─────────────────────────────────────────────────────
+  useEffect(() => {
+    // Cargar catálogo de ciudades una sola vez
+    getCiudades().then(setCiudadesCat).catch(console.error);
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     getValienteById(valienteId)
@@ -169,9 +187,19 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
           materia_dificil:  data.educacion?.materia_dificil ?? '',
         });
         setUbicacion({
-          direccion: data.ubicacion?.direccion ?? '',
-          estrato:   data.ubicacion?.estrato ?? '',
+          direccion:   data.ubicacion?.direccion ?? '',
+          estrato:     data.ubicacion?.estrato ?? '',
+          ciudad_id:   data.ubicacion?.ciudad_id ? String(data.ubicacion.ciudad_id) : '',
+          comuna_id:   data.ubicacion?.comuna_id ? String(data.ubicacion.comuna_id) : '',
+          barrio_id:   data.ubicacion?.barrio_id ? String(data.ubicacion.barrio_id) : '',
+          barrio_otro: '',
         });
+        // Precargar comunas y barrios si ya había ciudad guardada
+        if (data.ubicacion?.ciudad_id) {
+          const cid = data.ubicacion.ciudad_id;
+          getComunas(cid).then(setComunasCat).catch(console.error);
+          getBarrios(cid).then(setBarriosCat).catch(console.error);
+        }
         setContextoFamiliar({
           composicion_familiar:  (data.contexto_familiar as any)?.composicion_familiar ?? '',
           numero_personas_hogar: String((data.contexto_familiar as any)?.numero_personas_hogar ?? ''),
@@ -368,13 +396,15 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
 
       await guardarUbicacion({
         valiente_id: valienteId,
-        direccion: ubicacion.direccion || null,
-        estrato: ubicacion.estrato || null,
-        ciudad_id: valiente.ubicacion?.ciudad_id ?? null,
-        comuna_id: valiente.ubicacion?.comuna_id ?? null,
-        barrio_id: valiente.ubicacion?.barrio_id ?? null,
-        latitud: valiente.ubicacion?.latitud ?? null,
-        longitud: valiente.ubicacion?.longitud ?? null,
+        direccion:  ubicacion.direccion || null,
+        estrato:    ubicacion.estrato || null,
+        ciudad_id:  ubicacion.ciudad_id ? Number(ubicacion.ciudad_id) : null,
+        comuna_id:  ubicacion.comuna_id ? Number(ubicacion.comuna_id) : null,
+        barrio_id:  ubicacion.barrio_id && ubicacion.barrio_id !== 'otro'
+          ? Number(ubicacion.barrio_id)
+          : null,
+        latitud:    valiente.ubicacion?.latitud ?? null,
+        longitud:   valiente.ubicacion?.longitud ?? null,
       });
 
       await guardarContextoFamiliar({
@@ -493,7 +523,7 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
             <Field label="Apodo"              name="apodo"            value={basic.apodo}            onChange={ch(setBasic)} />
             <Field label="Fecha Nacimiento"   name="fecha_nacimiento" value={basic.fecha_nacimiento} onChange={ch(setBasic)} type="date" />
             <Field label="Sexo Biologico"     name="sexo"             value={basic.sexo}             onChange={ch(setBasic)}
-              options={[{value:'Masculino',label:'Masculino'},{value:'Femenino',label:'Femenino'}]} />
+              options={[{value:'Masculino',label:'Masculino'},{value:'Femenino',label:'Femenino'},{value:'Intersexual',label:'Intersexual'}]} />
             <Field label="Identidad de Genero" name="identidad_genero" value={basic.identidad_genero} onChange={ch(setBasic)}
               options={[{value:'Masculino',label:'Masculino'},{value:'Femenino',label:'Femenino'},{value:'No Binario',label:'No Binario'},{value:'Prefiero no decir',label:'Prefiero no decir'}]} />
             <Field label="Nacionalidad"       name="nacionalidad"     value={basic.nacionalidad}     onChange={ch(setBasic)} />
@@ -546,6 +576,67 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
       {activeTab === 'socio' && (
         <div className="space-y-4">
           <Section title="Ubicacion">
+            {/* Ciudad */}
+            <div>
+              <label className="text-xs text-slate-500 font-semibold mb-1 block uppercase tracking-wide">Ciudad / Municipio</label>
+              <select
+                value={ubicacion.ciudad_id}
+                onChange={e => {
+                  const id = e.target.value;
+                  setUbicacion(prev => ({ ...prev, ciudad_id: id, comuna_id: '', barrio_id: '', barrio_otro: '' }));
+                  setComunasCat([]);
+                  setBarriosCat([]);
+                  if (id) {
+                    getComunas(Number(id)).then(setComunasCat).catch(console.error);
+                    getBarrios(Number(id)).then(setBarriosCat).catch(console.error);
+                  }
+                }}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+              >
+                <option value="">Seleccionar ciudad...</option>
+                {ciudadesCat.map(c => <option key={c.id} value={c.id}>{c.nombre}{c.departamento ? ` — ${c.departamento}` : ''}</option>)}
+              </select>
+            </div>
+
+            {/* Barrio / Corregimiento */}
+            <div>
+              <label className="text-xs text-slate-500 font-semibold mb-1 block uppercase tracking-wide">Barrio / Corregimiento</label>
+              <select
+                value={ubicacion.barrio_id}
+                onChange={e => setUbicacion(prev => ({ ...prev, barrio_id: e.target.value, barrio_otro: '' }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                disabled={!ubicacion.ciudad_id}
+              >
+                <option value="">{ubicacion.ciudad_id ? 'Seleccionar...' : 'Primero selecciona ciudad'}</option>
+                {barriosCat.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                <option value="otro">Otro (escribir)</option>
+              </select>
+              {ubicacion.barrio_id === 'otro' && (
+                <input
+                  type="text"
+                  placeholder="Escribe el barrio o corregimiento..."
+                  value={ubicacion.barrio_otro}
+                  onChange={e => setUbicacion(prev => ({ ...prev, barrio_otro: e.target.value }))}
+                  className="mt-2 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                />
+              )}
+            </div>
+
+            {/* Comuna — solo si la ciudad seleccionada tiene comunas */}
+            {comunasCat.length > 0 && (
+              <div>
+                <label className="text-xs text-slate-500 font-semibold mb-1 block uppercase tracking-wide">Comuna</label>
+                <select
+                  value={ubicacion.comuna_id}
+                  onChange={e => setUbicacion(prev => ({ ...prev, comuna_id: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                >
+                  <option value="">Seleccionar...</option>
+                  {comunasCat.map(c => <option key={c.id} value={c.id}>{formatComuna(c.nombre)}</option>)}
+                </select>
+              </div>
+            )}
+
             <Field label="Direccion de Residencia" name="direccion" value={ubicacion.direccion} onChange={ch(setUbicacion)} full />
             <Field label="Estrato" name="estrato" value={ubicacion.estrato} onChange={ch(setUbicacion)}
               options={['1','2','3','4','5','6'].map(v => ({value:v,label:`Estrato ${v}`}))} />
