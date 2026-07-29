@@ -87,6 +87,7 @@ const ExpressRegistration: React.FC<ExpressRegistrationProps> = ({ context, onBa
         valiente_id: valiente.id,
         eps_id: null,
         eps_nombre: null,
+        regimen_eps: null,
         ips_id: null,
         ips_nombre: null,
         tipo_sangre: null,

@@ -476,7 +476,7 @@ export async function getEstadisticasIngresos(): Promise<EstadisticaIngreso[]> {
     conteo[key] = (conteo[key] ?? 0) + 1;
   }
 
-  const ORDER = ORDEN_RANGOS_INGRESO;
+  const ORDER = ORDEN_RANGOS_INGRESO as readonly string[];
 
   return Object.entries(conteo)
     .map(([rango, total]) => ({ rango, total }))
