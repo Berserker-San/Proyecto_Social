@@ -1,30 +1,31 @@
-# Mejora 4. Ampliar ciudad, barrio y corregimiento
+# Mejora 8. Registrar detalles de medicamentos
 
 ## Prompt para Kiro
 
 ```text
-Ajusta el registro de ubicación para permitir personas que viven dentro y fuera de Cali.
+Amplía la sección de medicamentos en "Salud y Bienestar".
 
-Necesidad:
-Actualmente existen personas de lugares como Bitaco y participantes vinculados con Fanalca, por lo que las opciones de ciudad, barrio y corregimiento deben ser más amplias.
+Cuando la persona responda "Sí" a "¿Toma algún medicamento?", el sistema debe permitir registrar:
+- Nombre del medicamento.
+- Concentración o dosis.
+- Frecuencia de consumo.
 
 Antes de implementar:
-1. Revisa si ciudad, barrio, corregimiento, comuna y departamento se manejan como listas, texto, catálogos o llaves foráneas.
-2. Revisa si el sistema asume que todas las personas viven en Cali.
-3. Identifica filtros, reportes y validaciones que dependan de esa suposición.
+1. Revisa si actualmente existe un único campo de texto.
+2. Determina si el sistema debe permitir uno o varios medicamentos.
+3. Revisa cómo se muestran estos datos en consultas, edición, reportes y CSV.
 
-Propuesta funcional:
-- Incluir departamento o región cuando no exista.
-- Permitir seleccionar una ciudad o municipio.
-- Mostrar comuna solo cuando la ubicación corresponda a Cali.
-- Permitir registrar barrio o corregimiento según corresponda.
-- Agregar la opción "Otro" con campo de texto controlado cuando el lugar no exista en el catálogo.
-- Evitar que un usuario tenga que seleccionar una comuna de Cali si vive fuera de Cali.
-- Mantener los datos históricos sin pérdida.
+Implementación preferida:
+- Si una persona puede registrar varios medicamentos, crear una lista dinámica con opción de agregar y retirar filas.
+- Cada fila debe contener nombre, concentración o dosis y frecuencia.
+- Al cambiar la respuesta a "No", solicitar confirmación antes de eliminar detalles ya registrados.
+- Validar que no existan filas completamente vacías.
+- Mantener la información histórica que esté guardada en el campo anterior.
 
 Pruebas de aceptación:
-- Se puede registrar una persona residente en Cali.
-- Se puede registrar una persona residente fuera de Cali.
-- La comuna se solicita únicamente cuando aplica.
-- Se puede registrar un corregimiento.
-- Los filtros y reportes distinguen correctamente ciudad, barrio y corregimiento.
+- Al responder "No", los campos de medicamentos permanecen ocultos.
+- Al responder "Sí", se muestran los campos requeridos.
+- Se puede guardar y editar la información.
+- Si se permiten varios medicamentos, cada uno se conserva de manera independiente.
+- Los datos históricos se migran o se presentan sin pérdida.
+```

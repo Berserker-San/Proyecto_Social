@@ -206,6 +206,7 @@ export interface ValienteSalud {
   valiente_id: number;
   eps_id: number | null;
   eps_nombre: string | null;   // texto libre si no está en catálogo
+  regimen_eps: string | null;  // 'CONTRIBUTIVO' | 'SUBSIDIADO' | 'ESPECIAL' | null
   ips_id: number | null;
   ips_nombre: string | null;   // texto libre si no está en catálogo
   tipo_sangre: string | null;
@@ -406,8 +407,42 @@ export interface ValienteCompleto extends Valiente {
 }
 
 // =========================================================
-// ENUMS Y CONSTANTES
+// MEDICAMENTOS (estructura dentro de medicamentos_actuales)
+// Se serializa como JSON en el campo TEXT de valiente_salud.
+// Registros históricos contienen texto libre — se muestran
+// como entrada legado en la interfaz.
 // =========================================================
+
+export interface Medicamento {
+  nombre: string;
+  dosis: string;
+  frecuencia: string;
+}
+
+/**
+ * Parsea el campo medicamentos_actuales (TEXT) a un array de Medicamento.
+ * Si el valor no es JSON válido lo devuelve como entrada legado con nombre = valor original.
+ */
+export function parseMedicamentos(raw: string | null | undefined): Medicamento[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as Medicamento[];
+  } catch {
+    // texto libre histórico — lo envuelve como fila legado
+    return [{ nombre: raw, dosis: '', frecuencia: '' }];
+  }
+  return [];
+}
+
+/** Serializa un array de Medicamento a JSON para guardar en DB. */
+export function serializeMedicamentos(meds: Medicamento[]): string | null {
+  const clean = meds.filter(m => m.nombre.trim() || m.dosis.trim() || m.frecuencia.trim());
+  if (clean.length === 0) return null;
+  return JSON.stringify(clean);
+}
+
+
 
 export const TIPO_DOCUMENTO = {
   TI: 'TI',
