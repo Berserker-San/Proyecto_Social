@@ -36,7 +36,7 @@ Desarrollado como proyecto social universitario para una fundación real. Constr
 
 ### Carga Masiva por CSV
 - Componente `CSVUploader` con parser tolerante a errores
-- Procesa cada fila de forma independiente y reporta resultados por fila
+- Procesa cada fila de forma independiente y reporta resultados por fila.
 
 ### Perfil del Valiente
 Vista completa con 8 pestañas de carga diferida:
