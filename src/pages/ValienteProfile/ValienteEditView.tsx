@@ -10,6 +10,7 @@ import {
 } from '../../lib/services/perfiles.service';
 import { getCiudades, getComunas, getBarrios, formatComuna } from '../../lib/services/catalogos.service';
 import { parseMedicamentos, serializeMedicamentos } from '../../types/database.types';
+import { getRangosIngreso } from '../../lib/config/smmlv';
 import { supabase } from '../../lib/supabase';
 import type { ValienteCompleto, Ciudad, Comuna, Barrio, Medicamento } from '../../types/database.types';
 
@@ -725,7 +726,7 @@ const ValienteEditView: React.FC<ValienteEditViewProps> = ({ valienteId, onBack,
             <Field label="Composicion Familiar"      name="composicion_familiar"  value={contextoFamiliar.composicion_familiar}  onChange={ch(setContextoFamiliar)} full rows={2} />
             <Field label="Personas en el Hogar"      name="numero_personas_hogar" value={contextoFamiliar.numero_personas_hogar} onChange={ch(setContextoFamiliar)} type="number" />
             <Field label="Ingreso Mensual del Hogar" name="ingreso_mensual_hogar" value={contextoFamiliar.ingreso_mensual_hogar} onChange={ch(setContextoFamiliar)}
-              options={['Menos de 1 SMMLV','1 SMMLV','2 SMMLV','Más de 2 SMMLV'].map(v => ({value:v,label:v}))} />
+              options={getRangosIngreso().map(r => ({ value: r.value, label: r.label }))} />
             <Field label="Etnia" name="etnia" value={contextoFamiliar.etnia} onChange={ch(setContextoFamiliar)}
               options={['Mestizo','Afrocolombiano','Indigena','Raizal','Otro'].map(v => ({value:v,label:v}))} />
             <Field label="Victima del Conflicto" name="es_victima_conflicto" value={contextoFamiliar.es_victima_conflicto} onChange={ch(setContextoFamiliar)}

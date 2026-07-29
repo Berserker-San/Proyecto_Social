@@ -37,11 +37,15 @@ export async function eliminarEvento(id: number): Promise<void> {
 export async function getAsistenciaEvento(
   eventoId: number,
   programaId?: number | null
-): Promise<(Valiente & { asistencia_estado: string | null; asistencia_id: number | null })[]> {
+): Promise<(Valiente & {
+  asistencia_estado: string | null;
+  asistencia_id: number | null;
+  asistencia_comentario: string | null;
+  macro_soroca: string | null;
+})[]> {
 
   let valienteIds: number[] | null = null;
 
-  console.log(programaId);
   // Paso 1: si hay programa, obtener los valiente_id del programa con estado ACTIVO
   if (programaId) {
     const { data: vpData, error: vpErr } = await supabase
@@ -67,27 +71,42 @@ export async function getAsistenciaEvento(
     valientesQuery = valientesQuery.in('id', valienteIds) as typeof valientesQuery;
   }
 
-  // Paso 3: traer asistencias existentes del evento en paralelo
-  const [{ data: valientes, error: vErr }, { data: asistencias, error: aErr }] = await Promise.all([
+  // Paso 3: traer asistencias existentes y macros SOROCA en paralelo
+  const [
+    { data: valientes, error: vErr },
+    { data: asistencias, error: aErr },
+    { data: macros, error: mErr },
+  ] = await Promise.all([
     valientesQuery,
     supabase
       .from('asistencia')
-      .select('id, valiente_id, estado')
+      .select('id, valiente_id, estado, comentario')
       .eq('evento_id', eventoId),
+    supabase
+      .from('valiente_perfil_soroca')
+      .select('valiente_id, macro'),
   ]);
 
   if (vErr) throw vErr;
   if (aErr) throw aErr;
+  if (mErr) throw mErr;
 
-  const asistenciaMap = new Map<number, { id: number; estado: string }>();
+  const asistenciaMap = new Map<number, { id: number; estado: string; comentario: string | null }>();
   for (const a of asistencias ?? []) {
-    asistenciaMap.set(a.valiente_id, { id: a.id, estado: a.estado });
+    asistenciaMap.set(a.valiente_id, { id: a.id, estado: a.estado, comentario: a.comentario ?? null });
+  }
+
+  const macroMap = new Map<number, string | null>();
+  for (const m of macros ?? []) {
+    macroMap.set(m.valiente_id, m.macro ?? null);
   }
 
   return (valientes ?? []).map(v => ({
     ...(v as unknown as Valiente),
-    asistencia_estado: asistenciaMap.get(v.id)?.estado ?? null,
-    asistencia_id:     asistenciaMap.get(v.id)?.id     ?? null,
+    asistencia_estado:     asistenciaMap.get(v.id)?.estado     ?? null,
+    asistencia_id:         asistenciaMap.get(v.id)?.id         ?? null,
+    asistencia_comentario: asistenciaMap.get(v.id)?.comentario ?? null,
+    macro_soroca:          macroMap.get(v.id) ?? null,
   }));
 }
 
@@ -95,12 +114,21 @@ export async function getAsistenciaEvento(
 export async function upsertAsistencia(
   eventoId: number,
   valienteId: number,
-  estado: string
+  estado: string,
+  comentario: string | null = null,
+  registradoPor: string | null = null,
 ): Promise<Asistencia> {
   const { data, error } = await supabase
     .from('asistencia')
     .upsert(
-      { evento_id: eventoId, valiente_id: valienteId, estado },
+      {
+        evento_id:      eventoId,
+        valiente_id:    valienteId,
+        estado,
+        comentario:     comentario?.trim() || null,
+        registrado_por: registradoPor,
+        updated_at:     new Date().toISOString(),
+      },
       { onConflict: 'evento_id,valiente_id' }
     )
     .select()

@@ -8,7 +8,7 @@ import './FullRegistration.css';
 import { registrarValienteCompleto, subirDocumentoValiente } from '../../../lib/services/valientes.service';
 import { getEPS, getCiudades, getComunas, getBarrios, formatComuna, getInstitucionesEducativas, getPaises, getIPS } from '../../../lib/services/catalogos.service';
 import type { EPS, Ciudad, Comuna, Barrio, InstitucionEducativa, Pais, IPS, Medicamento } from '../../../types/database.types';
-import { serializeMedicamentos as serializeMeds } from '../../../types/database.types';
+import { getRangosIngreso } from '../../../lib/config/smmlv';
 
 interface FullRegistrationProps {
   context: 'TRIBU' | 'SOROCA';
@@ -826,10 +826,9 @@ const FullRegistration: React.FC<FullRegistrationProps> = ({ context, onBack }) 
                   <label className="form-label">INGRESOS TOTALES POR FAMILIA</label>
                   <select name="familyIncome" value={formData.familyIncome} onChange={handleChange} className="form-select">
                     <option value="">Seleccionar...</option>
-                    <option value="Menos de 1 SMMLV">Menos de 1 SMMLV</option>
-                    <option value="1 SMMLV">1 SMMLV</option>
-                    <option value="2 SMMLV">2 SMMLV</option>
-                    <option value="Más de 2 SMMLV">Más de 2 SMMLV</option>
+                    {getRangosIngreso().map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

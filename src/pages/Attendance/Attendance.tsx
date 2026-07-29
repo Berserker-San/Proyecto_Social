@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   CalendarPlus, ChevronLeft, Users, CheckCircle2,
-  XCircle, Clock, Search, Loader2, Trash2, Calendar,
+  XCircle, Clock, Search, Loader2, Trash2, Calendar, MessageSquare, Filter,
 } from 'lucide-react';
 import { getEventos, crearEvento, eliminarEvento, getAsistenciaEvento, upsertAsistencia } from '../../lib/services/attendance.service';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +14,8 @@ type DateFilter = 'all' | 'past' | 'today' | 'upcoming';
 type ValienteConAsistencia = Valiente & {
   asistencia_estado: string | null;
   asistencia_id: number | null;
+  asistencia_comentario: string | null;
+  macro_soroca: string | null;
 };
 
 const ESTADOS = ['Presente', 'Ausente', 'Justificado'] as const;
@@ -37,10 +39,17 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
   const [loadingList,   setLoadingList]   = useState(true);
   const [loadingTake,   setLoadingTake]   = useState(false);
   const [saving,        setSaving]        = useState<number | null>(null);
+  // Mapa valienteId → comentario en edición (borrador local antes de guardar)
+  const [comentarios,   setComentarios]   = useState<Record<number, string>>({});
   const [showForm,      setShowForm]      = useState(false);
   const [dateFilter,    setDateFilter]    = useState<DateFilter>('today');
   const [searchDate,    setSearchDate]    = useState('');
   const [programas,     setProgramas]     = useState<{ id: number; codigo: string; nombre: string }[]>([]);
+  // Filtro de programa en la lista de eventos (selector explícito)
+  const [programaFilter, setProgramaFilter] = useState<string>('');
+  // Filtros en la vista de toma de asistencia
+  const [macroFilter,    setMacroFilter]    = useState<string>('');  // '' = todos los macros
+  const [estadoFilter,   setEstadoFilter]   = useState<string>('');  // '' = todos los estados
   const [formData,      setFormData]      = useState({
     nombre_evento: '',
     fecha: '',
@@ -86,8 +95,18 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
     setSelectedEvento(evento);
     setView('take');
     setLoadingTake(true);
+    setSearch('');
+    setMacroFilter('');
+    setEstadoFilter('');
     try {
-      setValientes(await getAsistenciaEvento(evento.id, evento.programa_id));
+      const data = await getAsistenciaEvento(evento.id, evento.programa_id);
+      setValientes(data);
+      // Inicializar mapa de comentarios con los valores ya guardados
+      const inicial: Record<number, string> = {};
+      for (const v of data) {
+        if (v.asistencia_comentario) inicial[v.id] = v.asistencia_comentario;
+      }
+      setComentarios(inicial);
     } catch (e) {
       console.error(e);
     } finally {
@@ -100,9 +119,35 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
     if (!selectedEvento) return;
     setSaving(valienteId);
     try {
-      await upsertAsistencia(selectedEvento.id, valienteId, estado);
+      const comentario = comentarios[valienteId] ?? null;
+      await upsertAsistencia(selectedEvento.id, valienteId, estado, comentario, usuarioId);
       setValientes(prev =>
-        prev.map(v => v.id === valienteId ? { ...v, asistencia_estado: estado } : v)
+        prev.map(v => v.id === valienteId
+          ? { ...v, asistencia_estado: estado, asistencia_comentario: comentario }
+          : v
+        )
+      );
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  // ── Guardar comentario sin cambiar estado ─────────────────────────────
+  const handleSaveComentario = async (valienteId: number) => {
+    if (!selectedEvento) return;
+    const v = valientes.find(x => x.id === valienteId);
+    if (!v?.asistencia_estado) return; // no hay estado aún, no guardar
+    setSaving(valienteId);
+    try {
+      const comentario = comentarios[valienteId] ?? null;
+      await upsertAsistencia(selectedEvento.id, valienteId, v.asistencia_estado, comentario, usuarioId);
+      setValientes(prev =>
+        prev.map(x => x.id === valienteId
+          ? { ...x, asistencia_comentario: comentario }
+          : x
+        )
       );
     } catch (e) {
       console.error(e);
@@ -150,12 +195,19 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
     }
   };
 
-  // ── Filtro búsqueda ───────────────────────────────────────────────────
-  const filtered = valientes.filter(v =>
-    `${v.nombres} ${v.apellidos} ${v.numero_documento}`
+  // ── Filtro búsqueda + macro + estado en vista toma ───────────────────
+  const filtered = valientes.filter(v => {
+    const matchSearch = `${v.nombres} ${v.apellidos} ${v.numero_documento}`
       .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+      .includes(search.toLowerCase());
+    const matchMacro  = !macroFilter  || v.macro_soroca === macroFilter;
+    const matchEstado = !estadoFilter
+      ? true
+      : estadoFilter === 'sin_marcar'
+        ? !v.asistencia_estado
+        : v.asistencia_estado === estadoFilter;
+    return matchSearch && matchMacro && matchEstado;
+  });
 
   // ── Filtro eventos por contexto ───────────────────────────────────────
   // Fecha local colombiana (UTC-5) en formato YYYY-MM-DD
@@ -167,12 +219,17 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
 
   const eventosFiltrados = eventos
     .filter(ev => {
-      // Filtro por contexto/programa
+      // Filtro por contexto/programa prop
       if (context !== 'GLOBAL') {
         if (ev.programa_id) {
           const prog = programas.find(p => p.id === ev.programa_id);
           if (prog?.codigo !== context) return false;
         }
+      }
+      // Filtro explícito por selector de programa
+      if (programaFilter) {
+        if (!ev.programa_id) return false;
+        if (String(ev.programa_id) !== programaFilter) return false;
       }
       // Si hay búsqueda por fecha exacta, tiene prioridad
       if (searchDate) return ev.fecha === searchDate;
@@ -184,10 +241,16 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
       return true;
     });
 
-  const presentCount    = valientes.filter(v => v.asistencia_estado === 'Presente').length;
-  const ausenteCount    = valientes.filter(v => v.asistencia_estado === 'Ausente').length;
-  const justCount       = valientes.filter(v => v.asistencia_estado === 'Justificado').length;
-  const sinMarcarCount  = valientes.filter(v => !v.asistencia_estado).length;
+  // Conteos responden al subconjunto filtrado (búsqueda + macro + estado)
+  const presentCount   = filtered.filter(v => v.asistencia_estado === 'Presente').length;
+  const ausenteCount   = filtered.filter(v => v.asistencia_estado === 'Ausente').length;
+  const justCount      = filtered.filter(v => v.asistencia_estado === 'Justificado').length;
+  const sinMarcarCount = filtered.filter(v => !v.asistencia_estado).length;
+
+  // Macros disponibles en el evento actual (para el selector de filtro)
+  const macrosDisponibles = Array.from(
+    new Set(valientes.map(v => v.macro_soroca).filter(Boolean))
+  ) as string[];
 
   // ── VISTA: Lista de eventos ───────────────────────────────────────────
   if (view === 'list') {
@@ -208,8 +271,22 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
           </button>
         </div>
 
-        {/* Filtros de fecha */}
-        <div className="att-filters-row">
+        {/* Filtro por programa + filtros de fecha */}
+        <div className="att-filters-row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+          {/* Selector de programa — solo en GLOBAL */}
+          {context === 'GLOBAL' && programas.length > 0 && (
+            <select
+              value={programaFilter}
+              onChange={e => setProgramaFilter(e.target.value)}
+              className="att-input"
+              style={{ width: 'auto', minWidth: '9rem' }}
+            >
+              <option value="">Todos los programas</option>
+              {programas.map(p => (
+                <option key={p.id} value={String(p.id)}>{p.nombre}</option>
+              ))}
+            </select>
+          )}
           <div className="att-date-filters">
             {([
               { key: 'all',      label: 'Todos'      },
@@ -395,6 +472,46 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
         </div>
       </div>
 
+      {/* Filtros de macro y estado — debajo del resumen */}
+      {(macrosDisponibles.length > 0 || true) && (
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', padding: '0 1rem 0.5rem' }}>
+          {macrosDisponibles.length > 0 && (
+            <select
+              value={macroFilter}
+              onChange={e => setMacroFilter(e.target.value)}
+              className="att-input"
+              style={{ width: 'auto', minWidth: '9rem', fontSize: '0.8rem' }}
+            >
+              <option value="">Todos los macros</option>
+              {macrosDisponibles.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          )}
+          <select
+            value={estadoFilter}
+            onChange={e => setEstadoFilter(e.target.value)}
+            className="att-input"
+            style={{ width: 'auto', minWidth: '9rem', fontSize: '0.8rem' }}
+          >
+            <option value="">Todos los estados</option>
+            <option value="Presente">Presente</option>
+            <option value="Ausente">Ausente</option>
+            <option value="Justificado">Justificado</option>
+            <option value="sin_marcar">Sin marcar</option>
+          </select>
+          {(macroFilter || estadoFilter) && (
+            <button
+              onClick={() => { setMacroFilter(''); setEstadoFilter(''); }}
+              className="att-btn-ghost"
+              style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+            >
+              <Filter size={12} /> Limpiar filtros
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Búsqueda */}
       <div className="att-search-wrap">
         <Search size={15} className="att-search-icon" />
@@ -414,36 +531,87 @@ const Attendance: React.FC<{ usuarioId?: string | null; context?: 'GLOBAL' | 'TR
         </div>
       ) : (
         <div className="att-valiente-list">
-          {filtered.map(v => (
-            <div key={v.id} className="att-valiente-row">
-              <div className="att-valiente-avatar">
-                {v.nombres.charAt(0)}{v.apellidos.charAt(0)}
-              </div>
-              <div className="att-valiente-info">
-                <span className="att-valiente-name">{v.nombres} {v.apellidos}</span>
-                <span className="att-valiente-doc">{v.tipo_documento} {v.numero_documento}</span>
-              </div>
-              <div className="att-chips">
-                {saving === v.id ? (
-                  <Loader2 size={18} className="att-spin" />
-                ) : (
-                  ESTADOS.map(estado => {
-                    const cfg = estadoConfig[estado];
-                    const active = v.asistencia_estado === estado;
-                    return (
-                      <button
-                        key={estado}
-                        className={`att-chip ${cfg.cls}${active ? ' att-chip--active' : ''}`}
-                        onClick={() => handleMark(v.id, estado)}
-                      >
-                        {cfg.icon} {cfg.label}
-                      </button>
-                    );
-                  })
+          {filtered.map(v => {
+            const needsComment = v.asistencia_estado === 'Ausente' || v.asistencia_estado === 'Justificado';
+            const hasComment   = !!(v.asistencia_comentario || comentarios[v.id]?.trim());
+            return (
+              <div key={v.id} className="att-valiente-row" style={{ flexWrap: 'wrap' }}>
+                <div className="att-valiente-avatar">
+                  {v.nombres.charAt(0)}{v.apellidos.charAt(0)}
+                </div>
+                <div className="att-valiente-info">
+                  <span className="att-valiente-name">
+                    {v.nombres} {v.apellidos}
+                    {/* Indicador de comentario guardado */}
+                    {hasComment && v.asistencia_estado !== 'Ausente' && v.asistencia_estado !== 'Justificado' && (
+                      <span title="Tiene observación" style={{ marginLeft: '0.4rem', color: '#6366f1', verticalAlign: 'middle' }}>
+                        <MessageSquare size={13} />
+                      </span>
+                    )}
+                  </span>
+                  <span className="att-valiente-doc">{v.tipo_documento} {v.numero_documento}</span>
+                </div>
+                <div className="att-chips">
+                  {saving === v.id ? (
+                    <Loader2 size={18} className="att-spin" />
+                  ) : (
+                    ESTADOS.map(estado => {
+                      const cfg = estadoConfig[estado];
+                      const active = v.asistencia_estado === estado;
+                      return (
+                        <button
+                          key={estado}
+                          className={`att-chip ${cfg.cls}${active ? ' att-chip--active' : ''}`}
+                          onClick={() => handleMark(v.id, estado)}
+                        >
+                          {cfg.icon} {cfg.label}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+                {/* Campo de comentario — visible cuando el estado requiere justificación */}
+                {needsComment && (
+                  <div style={{ width: '100%', paddingLeft: '3rem', marginTop: '0.4rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <textarea
+                      rows={2}
+                      placeholder={v.asistencia_estado === 'Justificado' ? 'Justificación (requerida)…' : 'Observación (opcional)…'}
+                      value={comentarios[v.id] ?? v.asistencia_comentario ?? ''}
+                      onChange={e => setComentarios(prev => ({ ...prev, [v.id]: e.target.value }))}
+                      style={{
+                        flex: 1,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.5rem',
+                        padding: '0.4rem 0.6rem',
+                        fontSize: '0.8rem',
+                        resize: 'vertical',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        backgroundColor: '#f8fafc',
+                      }}
+                    />
+                    <button
+                      onClick={() => handleSaveComentario(v.id)}
+                      disabled={saving === v.id}
+                      style={{
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        background: '#6366f1',
+                        color: '#fff',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        marginTop: '0.1rem',
+                      }}
+                    >
+                      {saving === v.id ? <Loader2 size={13} className="att-spin" /> : 'Guardar'}
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

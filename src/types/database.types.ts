@@ -347,6 +347,9 @@ export interface Asistencia {
   evento_id: number;
   valiente_id: number | null;
   estado: string | null;
+  comentario: string | null;       // justificación / observación libre
+  registrado_por: string | null;   // uuid → usuario_sistema
+  updated_at: string | null;
 }
 
 // =========================================================
